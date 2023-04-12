@@ -1,15 +1,13 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    punctuated::Punctuated, token::Plus, Field, Ident, TraitBoundModifier, Type, TypeBareFn,
+    punctuated::Punctuated, token::Plus, Ident, TraitBoundModifier, Type, TypeBareFn,
     TypeImplTrait, TypeParamBound, TypePath, TypePtr, TypeReference, TypeTraitObject, TypeTuple,
 };
 
-pub fn mutate(tokens: &mut Field, new: TokenStream) {
-    todo!()
-}
+use crate::mutations::MockPrepared;
 
-pub fn get_mocking_candidate(field: &Type) -> TokenStream {
+pub fn get_mocking_candidate(field: &Type) -> MockPrepared {
     match field {
         Type::Array(arr) => get_mocking_candidate(&arr.elem),
         Type::BareFn(f) => mock_function(f),
@@ -42,11 +40,11 @@ pub fn get_mocked(field: &Type) -> TokenStream {
     // Ident::new(format!("{field}Mock").as_str(), field.span())
 }
 
-pub fn mock_function(f: &TypeBareFn) -> TokenStream {
+pub fn mock_function(f: &TypeBareFn) -> MockPrepared {
     todo!()
 }
 
-pub fn mock_and_impl_trait_for_it<T: Traitified>(imp: &T) -> TokenStream {
+pub fn mock_and_impl_trait_for_it<T: Traitified>(imp: &T) -> MockPrepared {
     let bounds = imp.bounds().iter().filter_map(|merkmal| {
             if let TypeParamBound::Trait(trait_bound) = merkmal && matches!(trait_bound.modifier, TraitBoundModifier::None) {
                 Some(&trait_bound.path)
@@ -61,7 +59,7 @@ pub fn mock_and_impl_trait_for_it<T: Traitified>(imp: &T) -> TokenStream {
         });
 
     let ident = create_mock(bounds);
-    ident
+    MockPrepared::new(todo!(), ident)
 }
 
 pub fn create_mock(mock_name: String) -> TokenStream {
@@ -76,23 +74,36 @@ pub fn implement_trait_for_mock(tr: Ident) -> TokenStream {
     todo!()
 }
 
-pub fn mock_pointer(p: &TypePtr) -> TokenStream {
+pub fn mock_pointer(p: &TypePtr) -> MockPrepared {
     todo!()
 }
 
-pub fn mock_associated_type(p: &TypePath) -> TokenStream {
+pub fn mock_associated_type(p: &TypePath) -> MockPrepared {
     todo!()
 }
 
-pub fn mock_reference(r: &TypeReference) -> TokenStream {
+pub fn mock_reference(r: &TypeReference) -> MockPrepared {
     todo!()
 }
 
-pub fn resolve_path_and_mock(p: &TypePath) -> TokenStream {
-    todo!()
+pub fn resolve_path_and_mock(p: &TypePath) -> MockPrepared {
+    let segments: Vec<&Ident> = p.path.segments.iter().map(|x| &x.ident).collect();
+    dbg!(&segments);
+
+    match &segments[..] {
+        &[x] => {
+            let new_class = Ident::new(format!("{x}Mock").as_str(), x.span());
+            let stream = quote! {
+                #new_class
+            };
+
+            MockPrepared::new(new_class, TokenStream::from(stream))
+        }
+        _ => todo!(),
+    }
 }
 
-pub fn mock_tuple(t: &TypeTuple) -> TokenStream {
+pub fn mock_tuple(t: &TypeTuple) -> MockPrepared {
     todo!()
 }
 

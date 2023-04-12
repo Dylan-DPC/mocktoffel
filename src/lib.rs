@@ -1,18 +1,16 @@
 #![feature(let_chains)]
 
-use muast::{get_mocking_candidate, mutate};
+use crate::branch::get_mocking_candidate;
+use crate::mutations::mutate;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, ItemStruct};
-mod muast;
+
+mod branch;
+mod mutations;
 
 #[proc_macro_attribute]
 pub fn toffel(tokens: TokenStream, input: TokenStream) -> TokenStream {
     let mut tokens = parse_macro_input!(input as ItemStruct);
-    dbg!(tokens
-        .fields
-        .iter()
-        .map(|x| &x.ident)
-        .collect::<Vec<&Option<syn::Ident>>>());
 
     let new_stream = tokens
         .fields
@@ -24,8 +22,10 @@ pub fn toffel(tokens: TokenStream, input: TokenStream) -> TokenStream {
                 .any(|attr| attr.meta.path().is_ident("mocked"))
         })
         .map(|field| {
-            let mocked_type = get_mocking_candidate(&field.ty);
-            mutate(field, mocked_type);
+            let mocked_stream = get_mocking_candidate(&field.ty);
+            dbg!(&field);
+            mutate(field, mocked_stream);
+            field
         });
 
     todo!()
