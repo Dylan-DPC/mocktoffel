@@ -1,34 +1,49 @@
 #![feature(let_chains)]
 
 use crate::branch::get_mocking_candidate;
-use crate::mutations::mutate;
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, ItemStruct};
+use quote::quote;
+use syn::{parse_macro_input, Fields, ItemStruct};
 
 mod branch;
-mod mutations;
+mod extract;
 
 #[proc_macro_attribute]
 pub fn toffel(tokens: TokenStream, input: TokenStream) -> TokenStream {
-    let mut tokens = parse_macro_input!(input as ItemStruct);
+    let tokens = parse_macro_input!(input as ItemStruct);
 
-    let new_stream = tokens
-        .fields
-        .iter_mut()
-        .find(|field| {
-            field
-                .attrs
-                .iter()
-                .any(|attr| attr.meta.path().is_ident("mocked"))
-        })
-        .map(|field| {
-            let mocked_stream = get_mocking_candidate(&field.ty);
-            dbg!(&field);
-            mutate(field, mocked_stream);
-            field
-        });
+    let fields: Vec<syn::Field> = match tokens.fields {
+        Fields::Named(named) => named
+            .named
+            .into_iter()
+            .map(|mut field| {
+                if field
+                    .attrs
+                    .iter()
+                    .any(|attr| attr.meta.path().is_ident("mocked"))
+                {
+                    field.attrs = vec![];
+                    field.ty = get_mocking_candidate(&field.ty).mocked_type;
+                    field
+                } else {
+                    field
+                }
+            })
+            .collect(),
+        _ => todo!(),
+    };
 
-    todo!()
+    let struct_name = tokens.ident;
+    let generics = tokens.generics;
+
+    let foo = quote! {
+           struct #struct_name #generics {
+                 #(#fields),*
+           }
+
+    };
+
+    TokenStream::from(foo)
 }
 
 /*

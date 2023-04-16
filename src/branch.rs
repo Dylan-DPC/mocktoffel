@@ -1,11 +1,11 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    punctuated::Punctuated, token::Plus, Ident, TraitBoundModifier, Type, TypeBareFn,
+    parse_str, punctuated::Punctuated, token::Plus, Ident, TraitBoundModifier, Type, TypeBareFn,
     TypeImplTrait, TypeParamBound, TypePath, TypePtr, TypeReference, TypeTraitObject, TypeTuple,
 };
 
-use crate::mutations::MockPrepared;
+use crate::extract::MockPrepared;
 
 pub fn get_mocking_candidate(field: &Type) -> MockPrepared {
     match field {
@@ -59,7 +59,7 @@ pub fn mock_and_impl_trait_for_it<T: Traitified>(imp: &T) -> MockPrepared {
         });
 
     let ident = create_mock(bounds);
-    MockPrepared::new(todo!(), ident)
+    MockPrepared::new(todo!(), Some(ident))
 }
 
 pub fn create_mock(mock_name: String) -> TokenStream {
@@ -88,16 +88,11 @@ pub fn mock_reference(r: &TypeReference) -> MockPrepared {
 
 pub fn resolve_path_and_mock(p: &TypePath) -> MockPrepared {
     let segments: Vec<&Ident> = p.path.segments.iter().map(|x| &x.ident).collect();
-    dbg!(&segments);
-
     match &segments[..] {
         &[x] => {
-            let new_class = Ident::new(format!("{x}Mock").as_str(), x.span());
-            let stream = quote! {
-                #new_class
-            };
+            let new_class = parse_str(format!("{x}Mock").as_str()).unwrap();
 
-            MockPrepared::new(new_class, TokenStream::from(stream))
+            MockPrepared::new(new_class, None)
         }
         _ => todo!(),
     }
