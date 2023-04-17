@@ -3,7 +3,7 @@
 use crate::branch::get_mocking_candidate;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Fields, ItemStruct};
+use syn::{parse_macro_input, Fields, ItemStruct, parse_str};
 
 mod branch;
 mod extract;
@@ -36,24 +36,26 @@ pub fn toffel(tokens: TokenStream, input: TokenStream) -> TokenStream {
     let struct_name = tokens.ident;
     let generics = tokens.generics;
 
-    let foo = quote! {
+    let struct_with_mocks_added = quote! {
            struct #struct_name #generics {
                  #(#fields),*
            }
 
     };
 
-    TokenStream::from(foo)
+    TokenStream::from(struct_with_mocks_added)
 }
 
-/*
 #[proc_macro_attribute]
 pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
-    let tokens = parse_macro_input!(input as ItemStruct);
-
-    todo!()
+    let mut tokens = parse_macro_input!(input as ItemStruct);
+    let name = tokens.ident;
+    let mock_name = format!("{name}Mock");
+    tokens.ident = parse_str(mock_name.as_str()).unwrap();
+    let mocked_struct = quote!(#tokens);
+    TokenStream::from(mocked_struct)
 }
-*/
+
 #[cfg(test)]
 mod tests {
     use super::*;

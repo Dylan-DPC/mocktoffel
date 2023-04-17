@@ -35,11 +35,6 @@ pub fn get_mocking_candidate(field: &Type) -> MockPrepared {
     }
 }
 
-pub fn get_mocked(field: &Type) -> TokenStream {
-    todo!()
-    // Ident::new(format!("{field}Mock").as_str(), field.span())
-}
-
 pub fn mock_function(f: &TypeBareFn) -> MockPrepared {
     todo!()
 }
