@@ -48,12 +48,17 @@ pub fn toffel(tokens: TokenStream, input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
-    let mut tokens = parse_macro_input!(input as ItemStruct);
-    let name = tokens.ident;
+    let tokens = parse_macro_input!(input as ItemStruct);
+    let mut mock = tokens.clone();
+    let name = mock.ident;
     let mock_name = format!("{name}Mock");
-    tokens.ident = parse_str(mock_name.as_str()).unwrap();
-    let mocked_struct = quote!(#tokens);
-    TokenStream::from(mocked_struct)
+    mock.ident = parse_str(mock_name.as_str()).unwrap();
+    let original_and_mocked_struct = quote! {
+        #tokens
+        #mock
+    };
+
+    TokenStream::from(original_and_mocked_struct)
 }
 
 #[cfg(test)]
