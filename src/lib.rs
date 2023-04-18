@@ -1,9 +1,10 @@
 #![feature(let_chains)]
 
 use crate::branch::get_mocking_candidate;
+use crate::extract::MockableType;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Fields, ItemStruct, parse_str};
+use syn::{parse_macro_input, parse_str, Fields, ItemStruct};
 
 mod branch;
 mod extract;
@@ -48,11 +49,18 @@ pub fn toffel(tokens: TokenStream, input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
-    let tokens = parse_macro_input!(input as ItemStruct);
+    let tokens = parse_macro_input!(input as MockableType);
     let mut mock = tokens.clone();
-    let name = mock.ident;
-    let mock_name = format!("{name}Mock");
-    mock.ident = parse_str(mock_name.as_str()).unwrap();
+    match mock {
+        MockableType::Struct(ref mut s) => {
+            let name = format!("{}Mock", s.ident);
+            s.ident = parse_str(name.as_str()).unwrap();
+        }
+        MockableType::Enum(ref mut e) => {
+            let name = format!("{}Mock", e.ident);
+            e.ident = parse_str(name.as_str()).unwrap();
+        }
+    };
     let original_and_mocked_struct = quote! {
         #tokens
         #mock
