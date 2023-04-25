@@ -1,11 +1,15 @@
 #![feature(let_chains)]
 
 use crate::branch::get_mocking_candidate;
-use crate::extract::MockableType;
+use crate::extract::{prepare_mock_name, ExtractName, MockableType};
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, parse_str, Fields, ItemStruct};
+use syn::{
+    parse_macro_input, parse_str, Fields, ImplItem, ItemImpl, ItemStruct, ReturnType, Type,
+    TypePath,
+};
 
+#[deny(clippy::pedantic)]
 mod branch;
 mod extract;
 
@@ -67,6 +71,58 @@ pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(original_and_mocked_struct)
+}
+
+#[proc_macro_attribute]
+pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> TokenStream {
+    let tokens = parse_macro_input!(input as ItemImpl);
+    let original_name = tokens.self_ty.extract_name();
+    let name = prepare_mock_name(&original_name);
+    let items = tokens.items.clone();
+    let functions = items.into_iter().map(|it| {
+        match it {
+            ImplItem::Const(c) => todo!(),
+            ImplItem::Fn(f) => {
+
+
+        let visibility = f.vis;
+        let function_name = f.sig.ident;
+        let inputs = f.sig.inputs.iter();
+
+        match f.sig.output {
+            ReturnType::Type(_, p) if matches!(&*p, Type::Path(TypePath {path: pat, .. }) if pat.extract_name() == original_name) => {
+                quote! {
+                    #visibility fn #function_name(#(#inputs), *) -> #name {
+                        Default::default()
+                    }
+                }
+            },
+            ReturnType::Type(_, ty) => {
+                quote! {
+                    #visibility fn #function_name(#(#inputs),*) -> #ty {
+                        Default::default()
+                    }
+                }
+            },
+            _ => {
+                quote! {
+                    #visibility fn #function_name(#(#inputs),*) {
+                    }
+                }
+            }
+        }
+
+            },
+            _ => todo!(),
+        }
+    });
+
+    TokenStream::from(quote! {
+        #tokens
+        impl #name {
+        #(#functions)*
+        }
+    })
 }
 
 #[cfg(test)]

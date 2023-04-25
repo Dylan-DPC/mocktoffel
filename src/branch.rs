@@ -53,11 +53,11 @@ pub fn mock_and_impl_trait_for_it<T: Traitified>(imp: &T) -> MockPrepared {
             mock_name
         });
 
-    let ident = create_mock(bounds);
+    let ident = create_mock(&bounds);
     MockPrepared::new(todo!(), Some(ident))
 }
 
-pub fn create_mock(mock_name: String) -> TokenStream {
+pub fn create_mock(mock_name: &str) -> TokenStream {
     let stream = quote! {
         struct mock_name {}
     };
