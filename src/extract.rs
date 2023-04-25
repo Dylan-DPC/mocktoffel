@@ -70,33 +70,3 @@ pub fn prepare_mock_name(name: &Ident) -> Ident {
     Ident::new(&inp, Span::call_site())
 }
 
-#[derive(Clone, Debug)]
-pub enum MockableType {
-    Struct(ItemStruct),
-    Enum(ItemEnum),
-}
-
-impl Parse for MockableType {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let la = input.lookahead1();
-        if la.peek(Token![struct]) {
-            input.parse().map(Self::Struct)
-        } else if la.peek(Token![enum]) {
-            input.parse().map(Self::Enum)
-        } else if la.peek(Token![#]) {
-            input.parse().map(Self::Struct)
-        } else {
-            dbg!("test");
-            todo!()
-        }
-    }
-}
-
-impl ToTokens for MockableType {
-    fn to_tokens(&self, tokens: &mut TokenStream2) {
-        match self {
-            MockableType::Struct(its) => its.to_tokens(tokens),
-            MockableType::Enum(ite) => ite.to_tokens(tokens),
-        }
-    }
-}
