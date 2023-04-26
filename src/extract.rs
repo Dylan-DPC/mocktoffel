@@ -1,11 +1,7 @@
 use crate::branch::Traitified;
 use proc_macro::TokenStream;
-use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::ToTokens;
-use syn::{
-    parse::{Parse, ParseStream, Result},
-    Ident, ItemEnum, ItemStruct, Path, Token, TraitBoundModifier, Type, TypeParamBound, TypePath,
-};
+use proc_macro2::Span;
+use syn::{Ident, Path, TraitBoundModifier, Type, TypeParamBound, TypePath};
 
 pub struct MockPrepared {
     pub mocked_type: Type,
@@ -69,4 +65,3 @@ pub fn prepare_mock_name(name: &Ident) -> Ident {
     let inp = format!("{name}Mock");
     Ident::new(&inp, Span::call_site())
 }
-

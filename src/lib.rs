@@ -5,8 +5,8 @@ use crate::extract::{prepare_mock_name, ExtractName};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse_macro_input, parse_str, Fields, Item, ImplItem, ItemImpl, ItemStruct, ReturnType, Type,
-    TypePath,
+    parse_macro_input, parse_str, Fields, FnArg, ImplItem, Item, ItemImpl, ItemStruct, ReturnType,
+    Type, TypePath,
 };
 
 #[deny(clippy::pedantic)]
@@ -63,7 +63,7 @@ pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
         Item::Enum(ref mut e) => {
             let name = format!("{}Mock", e.ident);
             e.ident = parse_str(name.as_str()).unwrap();
-        },
+        }
         _ => todo!(),
     };
     let original_and_mocked_struct = quote! {
@@ -73,22 +73,32 @@ pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
 
     TokenStream::from(original_and_mocked_struct)
 }
-    
 
 #[proc_macro_attribute]
 pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> TokenStream {
     let tokens = parse_macro_input!(input as ItemImpl);
-    let original_name = tokens.self_ty.extract_name();
+    let original_type = tokens.self_ty.clone();
+    let original_name = original_type.extract_name();
     let name = prepare_mock_name(&original_name);
     let items = tokens.items.clone();
+
     let functions = items.into_iter().map(|it| {
         match it {
             ImplItem::Const(c) => todo!(),
-            ImplItem::Fn(f) => {
-
-
+            ImplItem::Fn(mut f) => {
         let visibility = f.vis;
         let function_name = f.sig.ident;
+        f.sig.inputs.iter_mut().filter(|arg| {
+            matches!(arg, FnArg::Typed(typ) if typ.ty == original_type)
+        }).for_each(|arg| {
+            if let FnArg::Typed(typ) = arg {
+                typ.ty = Box::new(Type::Path(parse_str(format!("{name}").as_str()).unwrap()));
+            }
+            else {
+                unreachable!()
+            }
+        });
+
         let inputs = f.sig.inputs.iter();
 
         match f.sig.output {
