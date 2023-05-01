@@ -73,7 +73,6 @@ pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> To
         });
 
         let inputs = f.sig.inputs.iter();
-
         match f.sig.output {
             ReturnType::Type(_, p) if matches!(&*p, Type::Path(TypePath {path: pat, .. }) if pat.extract_name() == original_name) => {
                 quote! {
@@ -102,12 +101,20 @@ pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> To
         }
     });
 
-    TokenStream::from(quote! {
-        #tokens
-        impl #name {
+    if let Some((_, tr, _)) = tokens.trait_ {
+        let trait_ = tr.extract_name();
+        TokenStream::from(quote! {
+        impl #trait_ for #name {
         #(#functions)*
         }
-    })
+            })
+    } else {
+        TokenStream::from(quote! {
+            impl #name {
+           #(#functions)*
+           }
+        })
+    }
 }
 
 #[cfg(test)]
