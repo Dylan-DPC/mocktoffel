@@ -1,7 +1,7 @@
 use crate::branch::get_mocking_candidate;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Fields, ItemEnum, ItemStruct};
+use syn::{Field, Fields, ItemEnum, ItemStruct};
 
 pub trait Toffelise {
     fn replace_mocks(self) -> TokenStream;
@@ -9,35 +9,60 @@ pub trait Toffelise {
 
 impl Toffelise for ItemStruct {
     fn replace_mocks(self) -> TokenStream {
-        let fields: Vec<syn::Field> = match self.fields {
-            Fields::Named(named) => named
-                .named
-                .into_iter()
-                .map(|mut field| {
-                    if field
-                        .attrs
-                        .iter()
-                        .any(|attr| attr.meta.path().is_ident("mocked"))
-                    {
-                        field.attrs = vec![];
-                        field.ty = get_mocking_candidate(&field.ty).mocked_type;
-                        field
-                    } else {
-                        field
-                    }
-                })
-                .collect(),
-            _ => todo!(),
-        };
-
         let struct_name = self.ident;
         let generics = self.generics;
 
-        TokenStream::from(quote! {
-               struct #struct_name #generics {
-                     #(#fields),*
-               }
-        })
+        match self.fields {
+            Fields::Named(named) => {
+                let fields: Vec<Field> = named
+                    .named
+                    .into_iter()
+                    .map(|mut field| {
+                        if field
+                            .attrs
+                            .iter()
+                            .any(|attr| attr.meta.path().is_ident("mocked"))
+                        {
+                            field.attrs = vec![];
+                            field.ty = get_mocking_candidate(&field.ty).mocked_type;
+                        }
+                        field
+                    })
+                    .collect();
+
+                TokenStream::from(quote! {
+                       struct #struct_name #generics {
+                             #(#fields),*
+                       }
+                })
+            }
+
+            Fields::Unnamed(un) => {
+                let fields: Vec<Field> = un
+                    .unnamed
+                    .into_iter()
+                    .map(|mut field| {
+                        if field
+                            .attrs
+                            .iter()
+                            .any(|attr| attr.meta.path().is_ident("mocked"))
+                        {
+                            field.attrs = vec![];
+                            field.ty = get_mocking_candidate(&field.ty).mocked_type;
+                        }
+                        field
+                    })
+                    .collect();
+
+                TokenStream::from(quote! {
+                   struct #struct_name #generics(
+                         #(#fields),*
+                    );
+
+                })
+            }
+            Fields::Unit => unreachable!(),
+        }
     }
 }
 

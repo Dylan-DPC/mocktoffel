@@ -89,7 +89,7 @@ pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> To
                     }
                 }
             },
-            _ => {
+            ReturnType::Default => {
                 quote! {
                     #visibility fn #function_name(#(#inputs),*) {
                     }
