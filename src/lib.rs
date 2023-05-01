@@ -1,54 +1,26 @@
 #![feature(let_chains)]
 
-use crate::branch::get_mocking_candidate;
 use crate::extract::{prepare_mock_name, ExtractName};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse_macro_input, parse_str, Fields, FnArg, ImplItem, Item, ItemImpl, ItemStruct, ReturnType,
-    Type, TypePath,
+    parse_macro_input, parse_str, FnArg, ImplItem, Item, ItemImpl, ReturnType, Type, TypePath,
 };
+use toffel::Toffelise;
 
-#[deny(clippy::pedantic)]
 mod branch;
 mod extract;
+mod toffel;
 
 #[proc_macro_attribute]
 pub fn toffel(tokens: TokenStream, input: TokenStream) -> TokenStream {
-    let tokens = parse_macro_input!(input as ItemStruct);
+    let tokens = parse_macro_input!(input as Item);
 
-    let fields: Vec<syn::Field> = match tokens.fields {
-        Fields::Named(named) => named
-            .named
-            .into_iter()
-            .map(|mut field| {
-                if field
-                    .attrs
-                    .iter()
-                    .any(|attr| attr.meta.path().is_ident("mocked"))
-                {
-                    field.attrs = vec![];
-                    field.ty = get_mocking_candidate(&field.ty).mocked_type;
-                    field
-                } else {
-                    field
-                }
-            })
-            .collect(),
+    match tokens {
+        Item::Struct(s) => s.replace_mocks(),
+        Item::Enum(e) => e.replace_mocks(),
         _ => todo!(),
-    };
-
-    let struct_name = tokens.ident;
-    let generics = tokens.generics;
-
-    let struct_with_mocks_added = quote! {
-           struct #struct_name #generics {
-                 #(#fields),*
-           }
-
-    };
-
-    TokenStream::from(struct_with_mocks_added)
+    }
 }
 
 #[proc_macro_attribute]
@@ -74,6 +46,7 @@ pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(original_and_mocked_struct)
 }
 
+#[allow(clippy::redundant_clone)]
 #[proc_macro_attribute]
 pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> TokenStream {
     let tokens = parse_macro_input!(input as ItemImpl);

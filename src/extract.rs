@@ -17,6 +17,7 @@ impl MockPrepared {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 pub trait ExtractName {
     fn extract_name(&self) -> Ident;
 }
