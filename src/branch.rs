@@ -1,8 +1,9 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse_str, punctuated::Punctuated, token::Plus, Ident, TraitBoundModifier, Type, TypeBareFn,
-    TypeImplTrait, TypeParamBound, TypePath, TypePtr, TypeReference, TypeTraitObject, TypeTuple,
+    parse_str, punctuated::Punctuated, token::Plus, Ident, PathSegment, TraitBoundModifier, Type,
+    TypeBareFn, TypeImplTrait, TypeParamBound, TypePath, TypePtr, TypeReference, TypeTraitObject,
+    TypeTuple,
 };
 
 use crate::extract::MockPrepared;
@@ -82,10 +83,14 @@ pub fn mock_reference(r: &TypeReference) -> MockPrepared {
 }
 
 pub fn resolve_path_and_mock(p: &TypePath) -> MockPrepared {
-    let segments: Vec<&Ident> = p.path.segments.iter().map(|x| &x.ident).collect();
+    let segments: Vec<&PathSegment> = p.path.segments.iter().collect();
     match &segments[..] {
         &[x] => {
-            let new_class = parse_str(format!("{x}Mock").as_str()).unwrap();
+            let mut new_class = parse_str(format!("{}Mock", x.ident).as_str()).unwrap();
+            if let Type::Path(ref mut p) = new_class {
+                let segment = p.path.segments.last_mut().unwrap();
+                segment.arguments = x.arguments.clone();
+            }
 
             MockPrepared::new(new_class, None)
         }

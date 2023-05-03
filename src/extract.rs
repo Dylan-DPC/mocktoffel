@@ -1,7 +1,10 @@
 use crate::branch::Traitified;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use syn::{Ident, Path, TraitBoundModifier, Type, TypeParamBound, TypePath};
+use syn::{
+    AngleBracketedGenericArguments, GenericArgument, Ident, Path, TraitBoundModifier, Type,
+    TypeParamBound, TypePath,
+};
 
 pub struct MockPrepared {
     pub mocked_type: Type,
