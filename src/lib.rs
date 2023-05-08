@@ -51,8 +51,11 @@ pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
 pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> TokenStream {
     let tokens = parse_macro_input!(input as ItemImpl);
     let original_type = tokens.self_ty.clone();
+    let impl_generics = tokens.generics;
     let original_name = original_type.extract_name();
-    let name = prepare_mock_name(&original_name);
+    let mocked_extract = prepare_mock_name(&original_name);
+    let generics = original_name.clone().generics;
+    let name = mocked_extract.name;
     let items = tokens.items.clone();
 
     let functions = items.into_iter().map(|it| {
@@ -65,7 +68,8 @@ pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> To
             matches!(arg, FnArg::Typed(typ) if typ.ty == original_type)
         }).for_each(|arg| {
             if let FnArg::Typed(typ) = arg {
-                typ.ty = Box::new(Type::Path(parse_str(format!("{name}").as_str()).unwrap()));
+                typ.ty = Box::new(Type::Path(parse_str(format!("{}", name).as_str()).unwrap()));
+
             }
             else {
                 unreachable!()
@@ -73,8 +77,11 @@ pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> To
         });
 
         let inputs = f.sig.inputs.iter();
+
+
         match f.sig.output {
-            ReturnType::Type(_, p) if matches!(&*p, Type::Path(TypePath {path: pat, .. }) if pat.extract_name() == original_name) => {
+            ReturnType::Type(_, p)
+                if matches!(&*p, Type::Path(TypePath {path: pat, .. }) if pat.extract_name() == original_name) => {
                 quote! {
                     #visibility fn #function_name(#(#inputs), *) -> #name {
                         Default::default()
@@ -102,7 +109,7 @@ pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> To
     });
 
     if let Some((_, tr, _)) = tokens.trait_ {
-        let trait_ = tr.extract_name();
+        let trait_ = tr.extract_name().name;
         TokenStream::from(quote! {
         impl #trait_ for #name {
         #(#functions)*
@@ -110,7 +117,7 @@ pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> To
             })
     } else {
         TokenStream::from(quote! {
-            impl #name {
+            impl #impl_generics #name #generics {
            #(#functions)*
            }
         })
