@@ -1,6 +1,6 @@
 #![feature(let_chains)]
 
-use crate::extract::{prepare_mock_name, ExtractName};
+use crate::extract::{prepare_mock_name, ExtractName, Extracted };
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
@@ -109,9 +109,9 @@ pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> To
     });
 
     if let Some((_, tr, _)) = tokens.trait_ {
-        let trait_ = tr.extract_name().name;
+        let Extracted { name: trait_, generics: trait_generics }  = tr.extract_name();
         TokenStream::from(quote! {
-        impl #trait_ for #name {
+        impl #impl_generics #trait_ #trait_generics for #name {
         #(#functions)*
         }
             })

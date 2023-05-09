@@ -2,8 +2,8 @@ use crate::branch::Traitified;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::{
-    AngleBracketedGenericArguments, Ident, Path, PathArguments, TraitBoundModifier, Type,
-    TypeParamBound, TypePath,
+    Ident, Path, TraitBoundModifier, Type,
+    TypeParamBound, TypePath, AngleBracketedGenericArguments, PathArguments,
 };
 
 pub struct MockPrepared {
@@ -20,6 +20,7 @@ impl MockPrepared {
     }
 }
 
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Extracted {
     pub name: Ident,
@@ -28,16 +29,21 @@ pub struct Extracted {
 
 impl Extracted {
     pub fn new(name: Ident, generics: Option<AngleBracketedGenericArguments>) -> Self {
-        Self { name, generics }
+        Self {
+            name,
+            generics,
+
+        }
     }
 
     pub fn with_ident(name: Ident) -> Self {
         Self {
             name,
-            generics: None,
+            generics: None
         }
     }
 }
+
 
 #[allow(clippy::module_name_repetitions)]
 pub trait ExtractName {
@@ -65,15 +71,16 @@ impl ExtractName for Type {
 impl ExtractName for Path {
     fn extract_name(&self) -> Extracted {
         let segment = self.segments.last().unwrap();
-        match &segment.arguments {
+        match &segment.arguments { 
             PathArguments::AngleBracketed(abga) => {
                 Extracted::new(segment.ident.clone(), Some(abga.clone()))
-            }
+            },
             PathArguments::None => {
                 Extracted::with_ident(self.segments.last().unwrap().ident.clone())
-            }
-
+            },
+            
             _ => unreachable!(),
+            
         }
     }
 }
@@ -95,6 +102,6 @@ fn extract_name_for_bounds<T: Traitified>(imp: &T) -> Ident {
 }
 
 pub fn prepare_mock_name(name: &Extracted) -> Extracted {
-    let inp = format!("{}Mock", name.name);
-    Extracted::new(Ident::new(&inp, Span::call_site()), name.generics.clone())
+            let inp = format!("{}Mock", name.name);
+        Extracted::new(Ident::new(&inp, Span::call_site()), name.generics.clone()) 
 }
