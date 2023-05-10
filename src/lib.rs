@@ -1,6 +1,6 @@
 #![feature(let_chains)]
 
-use crate::extract::{prepare_mock_name, ExtractName, Extracted };
+use crate::extract::{prepare_mock_name, ExtractName, Extracted};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
@@ -8,6 +8,7 @@ use syn::{
 };
 use toffel::Toffelise;
 
+use std::ops::DerefMut;
 mod branch;
 mod extract;
 mod toffel;
@@ -67,9 +68,14 @@ pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> To
         f.sig.inputs.iter_mut().filter(|arg| {
             matches!(arg, FnArg::Typed(typ) if typ.ty == original_type)
         }).for_each(|arg| {
-            if let FnArg::Typed(typ) = arg {
-                typ.ty = Box::new(Type::Path(parse_str(format!("{}", name).as_str()).unwrap()));
-
+            if let FnArg::Typed(ref mut typ) = arg && let Type::Path(ref mut p) = &mut *typ.ty {
+                let segment = p.path.segments.last_mut().unwrap();
+                let fn_generics = segment.arguments.clone();
+                *p = parse_str(format!("{}", name).as_str()).unwrap();
+                if let Type::Path(ref mut p) = &mut *typ.ty {
+                    let mut segment = p.path.segments.last_mut().unwrap();
+                    segment.arguments = fn_generics;
+                }
             }
             else {
                 unreachable!()
@@ -81,9 +87,9 @@ pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> To
 
         match f.sig.output {
             ReturnType::Type(_, p)
-                if matches!(&*p, Type::Path(TypePath {path: pat, .. }) if pat.extract_name() == original_name) => {
+                if matches!(&*p, Type::Path(TypePath {path: pat, .. }) if pat.extract_name().name == original_name.name) => {
                 quote! {
-                    #visibility fn #function_name(#(#inputs), *) -> #name {
+                    #visibility fn #function_name(#(#inputs), *) -> #name #generics {
                         Default::default()
                     }
                 }
@@ -109,7 +115,10 @@ pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> To
     });
 
     if let Some((_, tr, _)) = tokens.trait_ {
-        let Extracted { name: trait_, generics: trait_generics }  = tr.extract_name();
+        let Extracted {
+            name: trait_,
+            generics: trait_generics,
+        } = tr.extract_name();
         TokenStream::from(quote! {
         impl #impl_generics #trait_ #trait_generics for #name {
         #(#functions)*
