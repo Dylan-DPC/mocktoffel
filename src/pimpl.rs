@@ -58,8 +58,10 @@ impl MockContext {
                     };
 
                     let impl_generics = tokens.generics.clone();
+                    let generics = original_name.generics.clone();
+
                     TokenStream::from(quote! {
-                        impl #impl_generics #name {
+                        impl #impl_generics #name #generics {
                             #functions
                         }
                     })
