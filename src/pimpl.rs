@@ -2,7 +2,10 @@ use std::ops::Deref;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_str, FnArg, ImplItem, ImplItemFn, ItemImpl, ReturnType, Type, TypePath};
+use syn::{
+    parse, parse_str, FnArg, ImplItem, ImplItemFn, ImplItemType, ItemImpl, ReturnType, Type,
+    TypePath,
+};
 
 use crate::extract::{prepare_mock_name, ExtractName, Extracted};
 
@@ -20,58 +23,55 @@ impl MockContext {
         }
     }
 
+    #[allow(clippy::redundant_clone)]
     pub fn mock_impl(&self, tokens: ItemImpl) -> TokenStream {
         let original_type = tokens.self_ty.clone();
         let original_name = original_type.extract_name();
         let Extracted { name, .. } = prepare_mock_name(&original_name);
 
         match &tokens.trait_ {
-            Some((_, tr, _)) => tokens
-                .items
-                .into_iter()
-                .map(|item| {
-                    let functions = match item {
-                        ImplItem::Fn(mut f) => self.replace_self_from_function_with_mocks(f),
-                        _ => todo!(),
-                    };
+            Some((_, tr, _)) => {
+                let functions = tokens.items.into_iter().map(|item| match item {
+                    ImplItem::Fn(f) => self.replace_self_from_function_with_mocks(f),
+                    ImplItem::Type(mut ty) => {
+                        self.replace_mocks_in_associated_types(&mut ty);
+                        ImplItem::Type(ty)
+                    }
+                    _ => todo!(),
+                });
 
-                    let Extracted {
-                        name: trait_,
-                        generics: trait_generics,
-                    } = tr.extract_name();
-                    let impl_generics = tokens.generics.clone();
+                let Extracted {
+                    name: trait_,
+                    generics: trait_generics,
+                } = tr.extract_name();
+                let impl_generics = tokens.generics.clone();
 
-                    TokenStream::from(quote! {
-                        impl #impl_generics #trait_ #trait_generics for #name {
-                            #functions
-                        }
-                    })
+                TokenStream::from(quote! {
+                    impl #impl_generics #trait_ #trait_generics for #name {
+                        #(#functions)*
+                    }
                 })
-                .collect(),
-            _ => tokens
-                .items
-                .into_iter()
-                .map(|item| {
-                    let functions = match item {
-                        ImplItem::Fn(mut f) => self.replace_self_from_function_with_mocks(f),
-                        _ => todo!(),
-                    };
+            }
+            _ => {
+                let functions = tokens.items.into_iter().map(|item| match item {
+                    ImplItem::Fn(f) => self.replace_self_from_function_with_mocks(f),
+                    _ => unreachable!(),
+                });
 
-                    let impl_generics = tokens.generics.clone();
-                    let generics = original_name.generics.clone();
+                let impl_generics = tokens.generics.clone();
+                let generics = original_name.generics.clone();
 
-                    TokenStream::from(quote! {
-                        impl #impl_generics #name #generics {
-                            #functions
-                        }
-                    })
+                TokenStream::from(quote! {
+                    impl #impl_generics #name #generics {
+                        #(#functions)*
+                    }
                 })
-                .collect(),
+            }
         }
     }
 
     #[allow(clippy::explicit_deref_methods)]
-    fn replace_self_from_function_with_mocks(&self, mut f: ImplItemFn) -> ImplItemFn {
+    fn replace_self_from_function_with_mocks(&self, mut f: ImplItemFn) -> ImplItem {
         let visibility = f.vis;
 
         f.sig.inputs.iter_mut().filter_map(|arg| {
@@ -123,5 +123,18 @@ impl MockContext {
                    })
                }
            }).unwrap()
+    }
+
+    fn replace_mocks_in_associated_types(&self, associated_type: &mut ImplItemType) {
+        let Extracted { name, generics } = associated_type.ty.extract_name();
+        if name == self.original_type.extract_name().name {
+            let original_type = self.original_type.clone();
+            let Extracted {
+                name: mocked_name,
+                generics: mocked_generics,
+            } = prepare_mock_name(&original_type.extract_name());
+            associated_type.ty =
+                parse(TokenStream::from(quote! { #mocked_name #mocked_generics })).unwrap();
+        }
     }
 }

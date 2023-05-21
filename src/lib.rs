@@ -1,13 +1,10 @@
 #![feature(let_chains)]
 #![feature(if_let_guard)]
 
-use crate::extract::{prepare_mock_name, ExtractName, Extracted};
 use crate::pimpl::MockContext;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{
-    parse_macro_input, parse_str, FnArg, ImplItem, Item, ItemImpl, ReturnType, Type, TypePath,
-};
+use syn::{parse_macro_input, parse_str, Item, ItemImpl};
 use toffel::Toffelise;
 
 mod branch;
