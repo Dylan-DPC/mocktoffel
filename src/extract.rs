@@ -1,9 +1,11 @@
 use crate::branch::Traitified;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
+use quote::quote;
+use std::iter::FilterMap;
 use syn::{
-    AngleBracketedGenericArguments, Ident, Path, PathArguments, TraitBoundModifier, Type,
-    TypeParamBound, TypePath,
+    AngleBracketedGenericArguments, Ident, Item, ItemStruct, Meta, Path, PathArguments,
+    TraitBoundModifier, Type, TypeParamBound, TypePath,
 };
 
 pub struct MockPrepared {
@@ -97,4 +99,52 @@ fn extract_name_for_bounds<T: Traitified>(imp: &T) -> Ident {
 pub fn prepare_mock_name(name: &Extracted) -> Extracted {
     let inp = format!("{}Mock", name.name);
     Extracted::new(Ident::new(&inp, Span::call_site()), name.generics.clone())
+}
+
+pub fn parse_fields_and_generate_for_values(schtruct: &ItemStruct) -> TokenStream {
+    let (fields, values)  = schtruct.fields.iter().fold((vec![], vec![]), |(mut fields, mut values), field | {
+        match field.attrs.iter().find(|attr| attr.meta.path().is_ident("mock_with")) {
+            Some(v) if let Meta::List(ref list) = v.meta && let Some(value) = list.tokens.clone().into_iter().next() && let Some(ref ident) = field.ident => {
+                fields.push(ident.clone());
+                values.push(value);
+            },
+            None => {},
+            _ => todo!(),
+        };
+
+        (fields, values)
+    });
+
+    let struct_name = schtruct.ident.clone();
+    let tok = if fields.is_empty() {
+        quote! {
+            impl #struct_name {
+                pub fn mock_new() -> Self {
+                        Self::default()
+                    }
+                }
+        }
+    } else {
+        quote! {
+            impl #struct_name {
+                pub fn mock_new() -> Self {
+                    Self {
+                        #(#fields : #values),*
+                    }
+                }
+                }
+        }
+    };
+    TokenStream::from(tok)
+}
+
+pub fn clean_out_attributes(item: &mut Item) {
+    match item {
+        Item::Struct(s) => {
+            s.fields.iter_mut().for_each(|field| {
+                field.attrs.clear();
+            });
+        }
+        _ => todo!(),
+    }
 }

@@ -29,44 +29,41 @@ impl MockContext {
         let original_name = original_type.extract_name();
         let Extracted { name, .. } = prepare_mock_name(&original_name);
 
-        match &tokens.trait_ {
-            Some((_, tr, _)) => {
-                let functions = tokens.items.into_iter().map(|item| match item {
-                    ImplItem::Fn(f) => self.replace_self_from_function_with_mocks(f),
-                    ImplItem::Type(mut ty) => {
-                        self.replace_mocks_in_associated_types(&mut ty);
-                        ImplItem::Type(ty)
-                    }
-                    _ => todo!(),
-                });
+        if let Some((_, tr, _)) = tokens.trait_ {
+            let functions = tokens.items.into_iter().map(|item| match item {
+                ImplItem::Fn(f) => self.replace_self_from_function_with_mocks(f),
+                ImplItem::Type(mut ty) => {
+                    self.replace_mocks_in_associated_types(&mut ty);
+                    ImplItem::Type(ty)
+                }
+                _ => todo!(),
+            });
 
-                let Extracted {
-                    name: trait_,
-                    generics: trait_generics,
-                } = tr.extract_name();
-                let impl_generics = tokens.generics.clone();
+            let Extracted {
+                name: trait_,
+                generics: trait_generics,
+            } = tr.extract_name();
+            let impl_generics = tokens.generics.clone();
 
-                TokenStream::from(quote! {
-                    impl #impl_generics #trait_ #trait_generics for #name {
-                        #(#functions)*
-                    }
-                })
-            }
-            _ => {
-                let functions = tokens.items.into_iter().map(|item| match item {
-                    ImplItem::Fn(f) => self.replace_self_from_function_with_mocks(f),
-                    _ => unreachable!(),
-                });
+            TokenStream::from(quote! {
+                impl #impl_generics #trait_ #trait_generics for #name {
+                    #(#functions)*
+                }
+            })
+        } else {
+            let functions = tokens.items.into_iter().map(|item| match item {
+                ImplItem::Fn(f) => self.replace_self_from_function_with_mocks(f),
+                _ => unreachable!(),
+            });
 
-                let impl_generics = tokens.generics.clone();
-                let generics = original_name.generics.clone();
+            let impl_generics = tokens.generics.clone();
+            let generics = original_name.generics.clone();
 
-                TokenStream::from(quote! {
-                    impl #impl_generics #name #generics {
-                        #(#functions)*
-                    }
-                })
-            }
+            TokenStream::from(quote! {
+                impl #impl_generics #name #generics {
+                    #(#functions)*
+                }
+            })
         }
     }
 
@@ -100,7 +97,7 @@ impl MockContext {
                    if pat.extract_name().name == original_name.name {
                        TokenStream::from(quote! {
                            #visibility fn #function_name (#(#inputs),*) -> #name #generics {
-                               Default::default()
+                               <#name>::mock_new()
                            }
                        })
                    } else {

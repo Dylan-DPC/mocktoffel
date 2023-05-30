@@ -1,5 +1,10 @@
 #![feature(let_chains)]
 #![feature(if_let_guard)]
+#![feature(exact_size_is_empty)]
+#![feature(extend_one)]
+#![feature(drain_filter)]
+#![feature(drain_keep_rest)]
+#![allow(unused)]
 
 use crate::pimpl::MockContext;
 use proc_macro::TokenStream;
@@ -25,30 +30,37 @@ pub fn toffel(tokens: TokenStream, input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
-    let tokens = parse_macro_input!(input as Item);
+    let mut tokens = parse_macro_input!(input as Item);
     let mut mock = tokens.clone();
-    match mock {
+    let fields = match mock {
         Item::Struct(ref mut s) => {
             let name = format!("{}Mock", s.ident);
             s.ident = parse_str(name.as_str()).unwrap();
+            let f = extract::parse_fields_and_generate_for_values(s);
+            extract::clean_out_attributes(&mut tokens);
+            f
         }
         Item::Enum(ref mut e) => {
             let name = format!("{}Mock", e.ident);
             e.ident = parse_str(name.as_str()).unwrap();
+            todo!()
         }
         _ => todo!(),
     };
-    let original_and_mocked_struct = quote! {
+
+    extract::clean_out_attributes(&mut mock);
+    let mut original_and_mocked_struct = TokenStream::from(quote! {
         #tokens
         #mock
-    };
+    });
 
-    TokenStream::from(original_and_mocked_struct)
+    original_and_mocked_struct.extend_one(fields);
+    original_and_mocked_struct
 }
 
 #[allow(clippy::redundant_clone)]
 #[proc_macro_attribute]
-pub fn mock_impl_and_use_defaults(tokens: TokenStream, input: TokenStream) -> TokenStream {
+pub fn mock_impl(tokens: TokenStream, input: TokenStream) -> TokenStream {
     let tokens = parse_macro_input!(input as ItemImpl);
     let original_type = tokens.self_ty.clone();
     let context = MockContext::new(original_type);
