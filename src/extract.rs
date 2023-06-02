@@ -4,7 +4,7 @@ use proc_macro2::Span;
 use quote::quote;
 use std::iter::FilterMap;
 use syn::{
-    AngleBracketedGenericArguments, Ident, Item, ItemStruct, Meta, Path, PathArguments,
+    AngleBracketedGenericArguments, Ident, Item, ItemEnum, ItemStruct, Meta, Path, PathArguments,
     TraitBoundModifier, Type, TypeParamBound, TypePath,
 };
 
@@ -14,7 +14,7 @@ pub struct MockPrepared {
 }
 
 impl MockPrepared {
-    pub fn new(mocked_type: Type, stream: Option<TokenStream>) -> Self {
+    pub const fn new(mocked_type: Type, stream: Option<TokenStream>) -> Self {
         Self {
             mocked_type,
             stream,
@@ -29,11 +29,11 @@ pub struct Extracted {
 }
 
 impl Extracted {
-    pub fn new(name: Ident, generics: Option<AngleBracketedGenericArguments>) -> Self {
+    pub const fn new(name: Ident, generics: Option<AngleBracketedGenericArguments>) -> Self {
         Self { name, generics }
     }
 
-    pub fn with_ident(name: Ident) -> Self {
+    pub const fn with_ident(name: Ident) -> Self {
         Self {
             name,
             generics: None,
@@ -49,16 +49,15 @@ pub trait ExtractName {
 impl ExtractName for Type {
     fn extract_name(&self) -> Extracted {
         match self {
-            Type::Array(_) => todo!(),
-            Type::BareFn(f) => todo!(),
-            Type::Group(g) => todo!(),
-            Type::ImplTrait(im) => Extracted::with_ident(extract_name_for_bounds(im)),
-            Type::Infer(inf) => unreachable!(),
-            Type::Macro(m) => todo!(),
-            Type::Paren(p) => todo!(),
-            Type::Path(TypePath { qself: None, path }) => path.extract_name(),
-
-            Type::Ptr(p) => todo!(),
+            Self::Array(_) => todo!(),
+            Self::BareFn(f) => todo!(),
+            Self::Group(g) => todo!(),
+            Self::ImplTrait(im) => Extracted::with_ident(extract_name_for_bounds(im)),
+            Self::Infer(inf) => unreachable!(),
+            Self::Macro(m) => todo!(),
+            Self::Paren(p) => todo!(),
+            Self::Path(TypePath { qself: None, path }) => path.extract_name(),
+            Self::Ptr(p) => todo!(),
             _ => todo!(),
         }
     }
@@ -138,6 +137,56 @@ pub fn parse_fields_and_generate_for_values(schtruct: &ItemStruct) -> TokenStrea
     TokenStream::from(tok)
 }
 
+pub fn parse_fields_and_generate_variant(enoom: &ItemEnum) -> TokenStream {
+    let enum_name = enoom.ident.clone();
+
+    let tok = if let Some(variant) = enoom.variants.iter().find(|field| {
+        field
+            .attrs
+            .iter()
+            .any(|attr| attr.meta.path().is_ident("mocked_value"))
+    }) {
+        let variant_name = &variant.ident;
+        quote! {
+            impl #enum_name {
+                pub fn mock_new() -> Self {
+                    Self::#variant_name
+                }
+            }
+        }
+    } else if let Some(variant) = enoom.variants.iter().find(|field| {
+        field
+            .attrs
+            .iter()
+            .any(|attr| attr.meta.path().is_ident("mocked_value_with"))
+    }) {
+        let variant_name = &variant.ident;
+        let value = if let Meta::List(ref ml) = variant.attrs.first().unwrap().meta {
+            &ml.tokens
+        } else {
+            unreachable!()
+        };
+
+        quote! {
+            impl #enum_name {
+                pub fn mock_new() -> Self {
+                    Self::#variant_name(#value)
+                }
+            }
+        }
+    } else {
+        quote! {
+            impl #enum_name {
+                pub fn mock_new() -> Self {
+                   Self::default()
+                }
+            }
+        }
+    };
+
+    TokenStream::from(tok)
+}
+
 pub fn clean_out_attributes(item: &mut Item) {
     match item {
         Item::Struct(s) => {
@@ -145,6 +194,11 @@ pub fn clean_out_attributes(item: &mut Item) {
                 field.attrs.clear();
             });
         }
-        _ => todo!(),
+        Item::Enum(e) => {
+            e.variants.iter_mut().for_each(|variant| {
+                variant.attrs.clear();
+            });
+        }
+        _ => unreachable!(),
     }
 }

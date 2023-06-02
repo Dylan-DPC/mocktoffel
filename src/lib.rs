@@ -43,7 +43,9 @@ pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
         Item::Enum(ref mut e) => {
             let name = format!("{}Mock", e.ident);
             e.ident = parse_str(name.as_str()).unwrap();
-            todo!()
+            let f = extract::parse_fields_and_generate_variant(e);
+            extract::clean_out_attributes(&mut tokens);
+            f
         }
         _ => todo!(),
     };
