@@ -4,8 +4,9 @@ use proc_macro2::Span;
 use quote::quote;
 use std::iter::FilterMap;
 use syn::{
-    AngleBracketedGenericArguments, Ident, Item, ItemEnum, ItemStruct, Meta, Path, PathArguments,
-    TraitBoundModifier, Type, TypeParamBound, TypePath,
+    punctuated::Punctuated, AngleBracketedGenericArguments, GenericParam, Generics, Ident, Item,
+    ItemEnum, ItemStruct, Meta, Path, PathArguments, TraitBoundModifier, Type, TypeParam,
+    TypeParamBound, TypePath,
 };
 
 pub struct MockPrepared {
@@ -22,7 +23,7 @@ impl MockPrepared {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Extracted {
     pub name: Ident,
     pub generics: Option<AngleBracketedGenericArguments>,
@@ -100,43 +101,67 @@ pub fn prepare_mock_name(name: &Extracted) -> Extracted {
     Extracted::new(Ident::new(&inp, Span::call_site()), name.generics.clone())
 }
 
-pub fn parse_fields_and_generate_for_values(schtruct: &ItemStruct) -> TokenStream {
-    let (fields, values)  = schtruct.fields.iter().fold((vec![], vec![]), |(mut fields, mut values), field | {
-        match field.attrs.iter().find(|attr| attr.meta.path().is_ident("mock_with")) {
-            Some(v) if let Meta::List(ref list) = v.meta && let Some(value) = list.tokens.clone().into_iter().next() && let Some(ref ident) = field.ident => {
+pub fn parse_fields_and_generate_for_values(schtruct: &mut ItemStruct) -> TokenStream {
+    let (fields, values) =
+        schtruct
+            .fields
+            .iter()
+            .fold((vec![], vec![]), |(mut fields, mut values), field| {
+                match field.attrs.iter().find(|attr| attr.meta.path().is_ident("mocked_with")) {
+            Some(v) if let Meta::List(ref list) = v.meta && let Some(ref ident) = field.ident => {
                 fields.push(ident.clone());
-                values.push(value);
+                values.push(list.tokens.clone());
+            },
+            Some(v) if let Meta::List(ref list) = v.meta => {
+                values.push(list.tokens.clone());
             },
             None => {},
             _ => todo!(),
         };
 
-        (fields, values)
-    });
+                (fields, values)
+            });
 
-    let struct_name = schtruct.ident.clone();
-    let tok = if fields.is_empty() {
-        quote! {
-            impl #struct_name {
-                pub fn mock_new() -> Self {
-                        Self::default()
+    let struct_name = &schtruct.ident;
+    let generics = &mut schtruct.generics;
+    let mut impl_generics = generics.clone();
+    extract_generics_from_bounds(&mut impl_generics);
+
+    let tok = match (&fields[..], &values[..]) {
+        (&[], &[]) => {
+            quote! {
+                impl #generics #struct_name #impl_generics {
+                    pub fn mock_new() -> Self {
+                            Self::default()
+                        }
                     }
-                }
+            }
         }
-    } else {
-        quote! {
-            impl #struct_name {
-                pub fn mock_new() -> Self {
-                    Self {
-                        #(#fields : #values),*
+        (&[], v) => {
+            quote! {
+                impl #generics #struct_name #impl_generics {
+                    pub fn mock_new() -> Self {
+                        Self(#(#values),*)
                     }
                 }
-                }
+            }
+        }
+        (f, v) => {
+            quote! {
+                impl #impl_generics #struct_name #impl_generics {
+                    pub fn mock_new() -> Self {
+                        Self {
+                            #(#fields : #values),*
+                        }
+                    }
+                    }
+            }
         }
     };
     TokenStream::from(tok)
 }
 
+#[allow(clippy::option_if_let_else)]
 pub fn parse_fields_and_generate_variant(enoom: &ItemEnum) -> TokenStream {
     let enum_name = enoom.ident.clone();
 
@@ -185,6 +210,17 @@ pub fn parse_fields_and_generate_variant(enoom: &ItemEnum) -> TokenStream {
     };
 
     TokenStream::from(tok)
+}
+
+pub fn extract_generics_from_bounds(bounds: &mut Generics) {
+    bounds.params.iter_mut().for_each(|bound| match bound {
+        GenericParam::Type(ty) => {
+            ty.colon_token = None;
+            ty.bounds = Punctuated::new();
+        }
+        GenericParam::Const(c) => todo!(),
+        GenericParam::Lifetime(lp) => {}
+    });
 }
 
 pub fn clean_out_attributes(item: &mut Item) {

@@ -5,6 +5,7 @@
 #![feature(drain_filter)]
 #![feature(drain_keep_rest)]
 #![allow(unused)]
+#![allow(clippy::module_name_repetitions)]
 
 use crate::pimpl::MockContext;
 use proc_macro::TokenStream;
