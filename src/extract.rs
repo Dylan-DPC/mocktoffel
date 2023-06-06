@@ -102,22 +102,20 @@ pub fn prepare_mock_name(name: &Extracted) -> Extracted {
 }
 
 pub fn parse_fields_and_generate_for_values(schtruct: &mut ItemStruct) -> TokenStream {
-    let (fields, values, dirty) =
+    let (fields, values) =
         schtruct
             .fields
             .iter()
-            .fold((vec![], vec![], false), |(mut fields, mut values, mut dirty), field| {
+            .fold((vec![], vec![]), |(mut fields, mut values), field| {
                 match (field.attrs.iter().find(|attr| attr.meta.path().is_ident("mocked_with")), &field.ident) {
             (Some(v), Some(ref ident )) if let Meta::List(ref list) = v.meta => {
                 fields.push(ident.clone());
                 values.push(list.tokens.clone());
-                dirty = true;
             },
             (Some(v), _) if let Meta::List(ref list) = v.meta => {
                 values.push(list.tokens.clone());
-                dirty = true;
             },
-            (None, Some(ref ident)) if dirty => {
+            (None, Some(ref ident)) => {
                 fields.push(ident.clone());
                 values.push(quote!( { Default::default() }));
 
@@ -126,7 +124,7 @@ pub fn parse_fields_and_generate_for_values(schtruct: &mut ItemStruct) -> TokenS
             _ => todo!(),
         };
 
-                (fields, values, dirty)
+                (fields, values)
             });
 
     let struct_name = &schtruct.ident;
@@ -134,17 +132,8 @@ pub fn parse_fields_and_generate_for_values(schtruct: &mut ItemStruct) -> TokenS
     let mut impl_generics = generics.clone();
     extract_generics_from_bounds(&mut impl_generics);
 
-    let tok = match (&fields[..], &values[..], dirty) {
-        (_, _, false) => {
-            quote! {
-                impl #generics #struct_name #impl_generics {
-                    pub fn mock_new() -> Self {
-                            Self::default()
-                        }
-                    }
-            }
-        }
-        (&[], v, _) => {
+    let tok = match (&fields[..], &values[..]) {
+        (&[], v) => {
             quote! {
                 impl #generics #struct_name #impl_generics {
                     pub fn mock_new() -> Self {
@@ -153,7 +142,7 @@ pub fn parse_fields_and_generate_for_values(schtruct: &mut ItemStruct) -> TokenS
                 }
             }
         }
-        (f, v, _) => {
+        (f, v) => {
             quote! {
                 impl #impl_generics #struct_name #impl_generics {
                     pub fn mock_new() -> Self {
