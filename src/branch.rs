@@ -84,18 +84,13 @@ pub fn mock_reference(r: &TypeReference) -> MockPrepared {
 
 pub fn resolve_path_and_mock(p: &TypePath) -> MockPrepared {
     let segments: Vec<&PathSegment> = p.path.segments.iter().collect();
-    match &segments[..] {
-        &[x] => {
-            let mut new_class = parse_str(format!("{}Mock", x.ident).as_str()).unwrap();
-            if let Type::Path(ref mut p) = new_class {
-                let segment = p.path.segments.last_mut().unwrap();
-                segment.arguments = x.arguments.clone();
-            }
-
-            MockPrepared::new(new_class, None)
-        }
-        _ => todo!(),
+    let segment = segments.last().unwrap();
+    let mut new_class = parse_str(format!("{}Mock", segment.ident).as_str()).unwrap();
+    if let Type::Path(ref mut p) = new_class {
+        let segment = p.path.segments.last_mut().unwrap();
+        segment.arguments = segment.arguments.clone();
     }
+    MockPrepared::new(new_class, None)
 }
 
 pub fn mock_tuple(t: &TypeTuple) -> MockPrepared {
