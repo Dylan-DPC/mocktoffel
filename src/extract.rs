@@ -120,7 +120,9 @@ pub fn parse_fields_and_generate_for_values(schtruct: &mut ItemStruct) -> TokenS
                 values.push(quote!( { Default::default() }));
 
             },
-            (None, _) => {},
+            (None, _) => {
+                values.push(quote!( { Default::default() }));
+            },
             _ => todo!(),
         };
 
