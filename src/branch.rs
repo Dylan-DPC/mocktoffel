@@ -1,4 +1,5 @@
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
 use syn::{
     parse_str, punctuated::Punctuated, token::Plus, Ident, PathSegment, TraitBoundModifier, Type,
@@ -82,15 +83,11 @@ pub fn mock_reference(r: &TypeReference) -> MockPrepared {
     todo!()
 }
 
-pub fn resolve_path_and_mock(p: &TypePath) -> MockPrepared {
-    let segments: Vec<&PathSegment> = p.path.segments.iter().collect();
-    let segment = segments.last().unwrap();
-    let mut new_class = parse_str(format!("{}Mock", segment.ident).as_str()).unwrap();
-    if let Type::Path(ref mut p) = new_class {
-        let segment = p.path.segments.last_mut().unwrap();
-        segment.arguments = segment.arguments.clone();
-    }
-    MockPrepared::new(new_class, None)
+pub fn resolve_path_and_mock(path: &TypePath) -> MockPrepared {
+    let mut path = path.clone();
+    let segment = path.path.segments.last_mut().unwrap();
+    segment.ident = Ident::new(format!("{}Mock", segment.ident).as_str(), Span::call_site());
+    MockPrepared::new(Type::Path(path), None)
 }
 
 pub fn mock_tuple(t: &TypeTuple) -> MockPrepared {
@@ -109,5 +106,29 @@ impl Traitified for TypeImplTrait {
 impl Traitified for TypeTraitObject {
     fn bounds(&self) -> &Punctuated<TypeParamBound, Plus> {
         &self.bounds
+    }
+}
+
+mod tests {
+    use super::*;
+
+    #[test]
+    pub fn resolve_path_and_mock_for_single_segment() {
+        let path = syn::TypePath {
+            qself: None,
+            path: syn::parse_str("Foo").unwrap(),
+        };
+        let mocked = resolve_path_and_mock(&path);
+        assert_eq!(mocked.mocked_type, syn::parse_str("FooMock").unwrap());
+    }
+
+    #[test]
+    pub fn resolve_multi_segment() {
+        let path = syn::TypePath {
+            qself: None,
+            path: syn::parse_str("qow::Fow").unwrap(),
+        };
+        let mocked = resolve_path_and_mock(&path);
+        assert_eq!(mocked.mocked_type, syn::parse_str("qow::FowMock").unwrap());
     }
 }
