@@ -135,6 +135,15 @@ pub fn parse_fields_and_generate_for_values(schtruct: &mut ItemStruct) -> TokenS
     extract_generics_from_bounds(&mut impl_generics);
 
     let tok = match (&fields[..], &values[..]) {
+        (&[], &[]) => {
+            quote! {
+                impl #generics #struct_name #impl_generics {
+                    pub fn mock_new() -> Self {
+                        Self {}
+                    }
+                }
+            }
+        }
         (&[], v) => {
             quote! {
                 impl #generics #struct_name #impl_generics {
