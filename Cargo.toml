@@ -1,9 +1,12 @@
 [package]
 name = "mocktoffel"
+description = "easy to use mocking library with minimal boilerplate"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.68.0"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+rust-version = "1.70.0"
+documentation = "https://docs.rs/mocktoffel"
+categories = ["development-tools::testing"]
+license = "MIT OR Apache-2.0"
 
 [lib]
 proc-macro = true

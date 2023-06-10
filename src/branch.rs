@@ -42,21 +42,7 @@ pub fn mock_function(f: &TypeBareFn) -> MockPrepared {
 }
 
 pub fn mock_and_impl_trait_for_it<T: Traitified>(imp: &T) -> MockPrepared {
-    let bounds = imp.bounds().iter().filter_map(|merkmal| {
-            if let TypeParamBound::Trait(trait_bound) = merkmal && matches!(trait_bound.modifier, TraitBoundModifier::None) {
-                Some(&trait_bound.path)
-            } else {
-                None
-            }
-        }).fold(String::new(), | mut mock_name, path| {
-            let p: String =  path.segments.iter().map(|x| format!("{}", x.ident)).collect();
-            mock_name.push_str(&p);
-
-            mock_name
-        });
-
-    let ident = create_mock(&bounds);
-    MockPrepared::new(todo!(), Some(ident))
+    todo!()
 }
 
 pub fn create_mock(mock_name: &str) -> TokenStream {
