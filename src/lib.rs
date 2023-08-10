@@ -25,7 +25,7 @@
 //! ```
 //! use mocktoffel::{toffel, mock};
 //!
-//! // #[toffel]
+//! #[toffel]
 //! pub struct Foo {
 //!     #[mocked]
 //!     bar: Bar,
@@ -178,7 +178,3 @@ pub fn mock_impl(tokens: TokenStream, input: TokenStream) -> TokenStream {
     context.mock_impl(tokens)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-}
