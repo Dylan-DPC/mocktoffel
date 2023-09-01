@@ -11,6 +11,7 @@ impl Toffelise for ItemStruct {
     fn replace_mocks(self) -> TokenStream {
         let struct_name = self.ident;
         let generics = self.generics;
+        let attributes = self.attrs;
 
         match self.fields {
             Fields::Named(named) => {
@@ -31,6 +32,7 @@ impl Toffelise for ItemStruct {
                     .collect();
 
                 TokenStream::from(quote! {
+                    #(#attributes)*
                        struct #struct_name #generics {
                              #(#fields),*
                        }

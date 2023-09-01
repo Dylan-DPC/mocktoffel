@@ -2,6 +2,7 @@ use crate::branch::Traitified;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
+use std::fmt::Write;
 use std::iter::FilterMap;
 use syn::{
     punctuated::Punctuated, AngleBracketedGenericArguments, GenericParam, Generics, Ident, Item,
@@ -88,7 +89,11 @@ fn extract_name_for_bounds<T: Traitified>(imp: &T) -> Ident {
                 None
             }
         }).fold(String::new(), | mut mock_name, path| {
-            let p: String =  path.segments.iter().map(|x| format!("{}", x.ident)).collect();
+            let p: String = path.segments.iter().fold(String::new(), |mut full_bound, segment| {
+                let _ = write!(full_bound, "{}", segment.ident);
+               full_bound
+            });
+
             mock_name.push_str(&p);
 
             mock_name

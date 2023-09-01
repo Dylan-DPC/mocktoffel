@@ -53,7 +53,7 @@ pub fn create_mock(mock_name: &str) -> TokenStream {
     TokenStream::from(stream)
 }
 
-pub fn implement_trait_for_mock(tr: Ident) -> TokenStream {
+pub fn implement_trait_for_mock(tr: &Ident) -> TokenStream {
     todo!()
 }
 

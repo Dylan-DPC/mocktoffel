@@ -66,7 +66,7 @@ mod toffel;
 ///
 /// #[toffel]
 /// struct Foo {
-///   #[mock]
+///   #[mocked]
 ///   bar: Bar,
 ///   qaz: String
 /// }
@@ -158,6 +158,7 @@ pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
 /// return types.
 ///
 /// ```rust
+/// use mocktoffel::{mock, mock_impl};
 /// #[mock]
 /// pub struct Foo {
 ///     foo: String
@@ -177,4 +178,3 @@ pub fn mock_impl(tokens: TokenStream, input: TokenStream) -> TokenStream {
     let context = MockContext::new(original_type);
     context.mock_impl(tokens)
 }
-
