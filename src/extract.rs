@@ -239,12 +239,30 @@ pub fn clean_out_attributes(item: &mut Item) {
     match item {
         Item::Struct(s) => {
             s.fields.iter_mut().for_each(|field| {
-                field.attrs.clear();
+                field.attrs = field
+                    .attrs
+                    .extract_if(|attr| {
+                        if let Meta::Path(ref p) = attr.meta {
+                            p.get_ident().map(|x| x.to_string() == "mocked").is_some()
+                        } else {
+                            false
+                        }
+                    })
+                    .collect();
             });
         }
         Item::Enum(e) => {
-            e.variants.iter_mut().for_each(|variant| {
-                variant.attrs.clear();
+            e.variants.iter_mut().for_each(|field| {
+                field.attrs = field
+                    .attrs
+                    .extract_if(|attr| {
+                        if let Meta::Path(ref p) = attr.meta {
+                            p.get_ident().map(|x| x.to_string() == "mocked").is_some()
+                        } else {
+                            false
+                        }
+                    })
+                    .collect();
             });
         }
         _ => unreachable!(),

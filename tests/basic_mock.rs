@@ -1,9 +1,17 @@
 use assert_proc::assert_proc;
 use mocktoffel::mock;
-#[assert_proc]
-#[assert_duplicated = FooMock]
+
+fn main() {}
+
+// #[assert_proc]
+// #[assert_duplicated = BarMock]
 #[mock]
 #[derive(Default)]
-struct Foo {
-    foo: i32,
+enum Bar {
+    #[default]
+    Never,
+    Gonna,
+    Give,
+    You,
+    Up,
 }

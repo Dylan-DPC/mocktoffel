@@ -2,6 +2,7 @@
 #![feature(if_let_guard)]
 #![feature(exact_size_is_empty)]
 #![feature(extend_one)]
+#![feature(extract_if)]
 #![allow(unused)]
 #![allow(clippy::module_name_repetitions)]
 #![deny(rust_2018_idioms)]
