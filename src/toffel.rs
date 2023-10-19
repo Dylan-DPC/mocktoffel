@@ -57,6 +57,7 @@ impl Toffelise for ItemStruct {
                     .collect();
 
                 TokenStream::from(quote! {
+                    #(#attributes)*
                    struct #struct_name #generics(
                          #(#fields),*
                     );
@@ -72,6 +73,7 @@ impl Toffelise for ItemEnum {
     fn replace_mocks(self) -> TokenStream {
         let enum_name = self.ident;
         let generics = self.generics;
+        let attributes = self.attrs;
 
         let variants = self
             .variants
@@ -96,6 +98,7 @@ impl Toffelise for ItemEnum {
             });
 
         TokenStream::from(quote! {
+           #(#attributes)*
             enum #enum_name #generics {
                 #(#variants),*
             }

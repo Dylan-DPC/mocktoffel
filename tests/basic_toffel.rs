@@ -15,3 +15,13 @@ struct Foo {
     #[mocked]
     foo: Bar,
 }
+
+// #[assert_proc]
+#[toffel]
+enum Baz {
+    Never(#[mocked] Bar),
+    Gonna,
+    Let,
+    You,
+    Down,
+}
