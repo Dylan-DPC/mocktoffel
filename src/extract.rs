@@ -1,13 +1,12 @@
 use crate::branch::Traitified;
 use proc_macro::TokenStream;
-use proc_macro2::{extra, Span};
+use proc_macro2::Span;
 use quote::quote;
 use std::fmt::Write;
-use std::iter::FilterMap;
 use syn::{
-    punctuated::Punctuated, AngleBracketedGenericArguments, Expr, Fields, GenericParam, Generics,
-    Ident, Item, ItemEnum, ItemStruct, Meta, Path, PathArguments, TraitBoundModifier, Type,
-    TypeParam, TypeParamBound, TypePath,
+    AngleBracketedGenericArguments, Expr, GenericParam, Generics, Ident, Item, ItemEnum,
+    ItemStruct, Meta, Path, PathArguments, TraitBoundModifier, Type, TypeParamBound, TypePath,
+    punctuated::Punctuated,
 };
 
 pub struct MockPrepared {
@@ -82,17 +81,26 @@ impl ExtractName for Path {
 }
 
 fn extract_name_for_bounds<T: Traitified>(imp: &T) -> Ident {
-    let name = imp.bounds().iter().filter_map(|merkmal| {
-            if let TypeParamBound::Trait(trait_bound) = merkmal && matches!(trait_bound.modifier, TraitBoundModifier::None) {
+    let name = imp
+        .bounds()
+        .iter()
+        .filter_map(|merkmal| {
+            if let TypeParamBound::Trait(trait_bound) = merkmal
+                && matches!(trait_bound.modifier, TraitBoundModifier::None)
+            {
                 Some(&trait_bound.path)
             } else {
                 None
             }
-        }).fold(String::new(), | mut mock_name, path| {
-            let p: String = path.segments.iter().fold(String::new(), |mut full_bound, segment| {
-                let _ = write!(full_bound, "{}", segment.ident);
-               full_bound
-            });
+        })
+        .fold(String::new(), |mut mock_name, path| {
+            let p: String = path
+                .segments
+                .iter()
+                .fold(String::new(), |mut full_bound, segment| {
+                    let _ = write!(full_bound, "{}", segment.ident);
+                    full_bound
+                });
 
             mock_name.push_str(&p);
 
@@ -112,24 +120,29 @@ pub fn parse_fields_and_generate_for_values(schtruct: &mut ItemStruct) -> TokenS
             .fields
             .iter()
             .fold((vec![], vec![]), |(mut fields, mut values), field| {
-                match (field.attrs.iter().find(|attr| attr.meta.path().is_ident("mocked_with")), &field.ident) {
-            (Some(v), Some(ref ident )) if let Meta::List(ref list) = v.meta => {
-                fields.push(ident.clone());
-                values.push(list.tokens.clone());
-            },
-            (Some(v), _) if let Meta::List(ref list) = v.meta => {
-                values.push(list.tokens.clone());
-            },
-            (None, Some(ref ident)) => {
-                fields.push(ident.clone());
-                values.push(quote!( { Default::default() }));
-
-            },
-            (None, _) => {
-                values.push(quote!( { Default::default() }));
-            },
-            _ => todo!(),
-        };
+                match (
+                    field
+                        .attrs
+                        .iter()
+                        .find(|attr| attr.meta.path().is_ident("mocked_with")),
+                    &field.ident,
+                ) {
+                    (Some(v), Some(ident)) if let Meta::List(ref list) = v.meta => {
+                        fields.push(ident.clone());
+                        values.push(list.tokens.clone());
+                    }
+                    (Some(v), _) if let Meta::List(ref list) = v.meta => {
+                        values.push(list.tokens.clone());
+                    }
+                    (None, Some(ident)) => {
+                        fields.push(ident.clone());
+                        values.push(quote!({ Default::default() }));
+                    }
+                    (None, _) => {
+                        values.push(quote!({ Default::default() }));
+                    }
+                    _ => todo!(),
+                }
 
                 (fields, values)
             });
@@ -181,21 +194,20 @@ pub fn parse_fields_and_generate_variant(enoom: &mut ItemEnum) -> TokenStream {
 
     let mocked_name = &mocked.name;
     let tok = if let Some(variant) = enoom.variants.iter_mut().find(|field| {
-        field
-            .attrs
-            .iter()
-            .any(|attr| {
-                if let Meta::NameValue(nv) = &attr.meta && nv.path.is_ident("mocked_with") {
-                    true
-                } else {
-                    false
-                }
-            })
-    })  {
+        field.attrs.iter().any(|attr| {
+            if let Meta::NameValue(nv) = &attr.meta
+                && nv.path.is_ident("mocked_with")
+            {
+                true
+            } else {
+                false
+            }
+        })
+    }) {
         let variant_name = &mut variant.ident;
         if let Meta::NameValue(ref mut ml) = variant.attrs.first_mut().unwrap().meta {
-            let mut value = &mut ml.value;
-            replace_with_mocked(&mut value, &enum_name, &mocked);
+            let value = &mut ml.value;
+            replace_with_mocked(value, &enum_name, &mocked);
             quote! {
                 impl #enum_name {
                     pub fn mock_new() -> #mocked_name {
@@ -212,19 +224,29 @@ pub fn parse_fields_and_generate_variant(enoom: &mut ItemEnum) -> TokenStream {
                 }
             }
         }
-    }
-
-    else if let (Some(variant), Some(field)) = enoom.variants.iter().fold((None, None), |(picked_value, picked_field), variant| {
-        variant.fields.iter().fold((picked_value, picked_field), |(picked_value, picked_field), field| {
-            field.attrs.iter().fold((picked_value, picked_field), |(picked_value, field), attr| {
-                if let Meta::NameValue(nv) = &attr.meta && nv.path.is_ident("mocked_with") {
-                    (Some(variant), Some(nv.value.clone()))
-                } else {
-                    (None, None)
-                }
+    } else if let (Some(variant), Some(field)) =
+        enoom
+            .variants
+            .iter()
+            .fold((None, None), |(picked_value, picked_field), variant| {
+                variant.fields.iter().fold(
+                    (picked_value, picked_field),
+                    |(picked_value, picked_field), field| {
+                        field.attrs.iter().fold(
+                            (picked_value, picked_field),
+                            |(picked_value, field), attr| {
+                                if let Meta::NameValue(nv) = &attr.meta
+                                    && nv.path.is_ident("mocked_with")
+                                {
+                                    (Some(variant), Some(nv.value.clone()))
+                                } else {
+                                    (None, None)
+                                }
+                            },
+                        )
+                    },
+                )
             })
-        })
-    })
     {
         let variant_name = &variant.ident;
         quote! {
@@ -242,10 +264,7 @@ pub fn parse_fields_and_generate_variant(enoom: &mut ItemEnum) -> TokenStream {
                 }
             }
         }
-    }
-
-
-    else {
+    } else {
         quote! {
             impl #enum_name {
                 pub fn mock_new() -> Self {
@@ -271,22 +290,25 @@ pub fn extract_generics_from_bounds(bounds: &mut Generics) {
 
 pub fn get_mocked_value_from_attributes(enoom: &mut ItemEnum, mocked: &Extracted) -> Option<Expr> {
     let name = &enoom.ident;
-    enoom.attrs.iter_mut().find_map(|attr| {
-        match &mut attr.meta {
-            Meta::NameValue(ref mut nv) if let Some(_) = nv.path.get_ident().map(|x| *x == "mocked_with") => {
+    enoom
+        .attrs
+        .iter_mut()
+        .find_map(|attr| match &mut attr.meta {
+            Meta::NameValue(nv)
+                if let Some(_) = nv.path.get_ident().map(|x| *x == "mocked_with") =>
+            {
                 replace_with_mocked(&mut nv.value, name, mocked);
                 let path = &nv.value;
                 Some(syn::parse(TokenStream::from(quote!(<#path>))).unwrap())
-            },
-            Meta::NameValue(nv) if let Some(_) = nv.path.get_ident().map(|x| *x == "mocked_with_default") => {
+            }
+            Meta::NameValue(nv)
+                if let Some(_) = nv.path.get_ident().map(|x| *x == "mocked_with_default") =>
+            {
                 Some(syn::parse(TokenStream::from(quote!(<#name>::default()))).unwrap())
-        },
+            }
 
-         _ => {
-            None
-        },
-        }
-    })
+            _ => None,
+        })
 }
 
 pub fn clean_out_attributes(item: &mut Item) {
@@ -295,7 +317,7 @@ pub fn clean_out_attributes(item: &mut Item) {
             s.fields.iter_mut().for_each(|field| {
                 field.attrs = field
                     .attrs
-                    .extract_if(|attr| {
+                    .extract_if(.., |attr| {
                         if let Meta::Path(ref p) = attr.meta {
                             p.get_ident().map(|x| *x == "mocked").is_some()
                         } else {
@@ -307,11 +329,13 @@ pub fn clean_out_attributes(item: &mut Item) {
         }
         Item::Enum(e) => {
             e.attrs.retain(|attr| {
-                    if let Meta::NameValue(p) = &attr.meta && p.path.get_ident().map(|x| *x == "mocked_with").is_some() {
-                        false
-                    } else {
-                        true
-                    }
+                if let Meta::NameValue(p) = &attr.meta
+                    && p.path.get_ident().map(|x| *x == "mocked_with").is_some()
+                {
+                    false
+                } else {
+                    true
+                }
             });
 
             e.variants.iter_mut().for_each(|field| {
@@ -319,24 +343,31 @@ pub fn clean_out_attributes(item: &mut Item) {
                     .attrs
                     .iter()
                     .filter_map(|attr| {
-                        if let Meta::NameValue(ref p) = attr.meta && p.path.get_ident().map(|x| *x == "mocked_with").is_some() {
+                        if let Meta::NameValue(ref p) = attr.meta
+                            && p.path.get_ident().map(|x| *x == "mocked_with").is_some()
+                        {
                             None
                         } else {
                             Some(attr.clone())
                         }
-                    }).collect();
+                    })
+                    .collect();
 
                 field.fields.iter_mut().for_each(|field| {
-                        field.attrs = field.attrs.iter().filter_map(|attr| {
-                            if let Meta::NameValue(ref p ) = attr.meta && p.path.get_ident().map(|x| *x == "mocked_with").is_some() {
+                    field.attrs = field
+                        .attrs
+                        .iter()
+                        .filter_map(|attr| {
+                            if let Meta::NameValue(ref p) = attr.meta
+                                && p.path.get_ident().map(|x| *x == "mocked_with").is_some()
+                            {
                                 None
-                    } else {
-                     Some(attr.clone())
+                            } else {
+                                Some(attr.clone())
                             }
-                }).collect();
-
+                        })
+                        .collect();
                 });
-
             });
         }
         _ => unreachable!(),
@@ -345,7 +376,7 @@ pub fn clean_out_attributes(item: &mut Item) {
 
 fn replace_with_mocked(expr: &mut Expr, name: &Ident, mocked: &Extracted) {
     match expr {
-        Expr::Path(ref mut path) => {
+        Expr::Path(path) => {
             let mocked_segment = path
                 .path
                 .segments
@@ -356,7 +387,7 @@ fn replace_with_mocked(expr: &mut Expr, name: &Ident, mocked: &Extracted) {
         }
 
         Expr::Call(call) => {
-            if let Expr::Path(ref mut p) = &mut call.func.as_mut() {
+            if let Expr::Path(p) = call.func.as_mut() {
                 let mocked_segment = p
                     .path
                     .segments

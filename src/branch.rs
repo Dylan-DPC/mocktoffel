@@ -2,13 +2,13 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{
-    parse_str, punctuated::Punctuated, token::Plus, Ident, PathSegment, TraitBoundModifier, Type,
-    TypeBareFn, TypeImplTrait, TypeParamBound, TypePath, TypePtr, TypeReference, TypeTraitObject,
-    TypeTuple,
+    Ident, Type, TypeBareFn, TypeImplTrait, TypeParamBound, TypePath, TypePtr, TypeReference,
+    TypeTraitObject, TypeTuple, punctuated::Punctuated, token::Plus,
 };
 
 use crate::extract::MockPrepared;
 
+#[allow(clippy::match_same_arms)]
 pub fn get_mocking_candidate(field: &Type) -> MockPrepared {
     match field {
         Type::Array(arr) => get_mocking_candidate(&arr.elem),

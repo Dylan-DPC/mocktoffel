@@ -1,11 +1,7 @@
-#![feature(let_chains)]
-#![feature(if_let_guard)]
-#![feature(exact_size_is_empty)]
 #![feature(extend_one)]
-#![feature(extract_if)]
-#![allow(unused)]
 #![allow(clippy::module_name_repetitions)]
 #![deny(rust_2018_idioms)]
+#![deny(clippy::pedantic)]
 
 //! This crate provides the capability of mocking local types easily without resorting to creating
 //! the mock by hand or having to create mocks for each test.
@@ -46,7 +42,7 @@
 use crate::pimpl::MockContext;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, parse_str, Item, ItemImpl};
+use syn::{Item, ItemImpl, parse_macro_input, parse_str};
 use toffel::Toffelise;
 
 mod branch;
@@ -121,7 +117,7 @@ pub fn toffel(tokens: TokenStream, input: TokenStream) -> TokenStream {
 ///     
 /// ```
 ///
-
+#[allow(clippy::missing_panics_doc)]
 #[proc_macro_attribute]
 pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
     let mut tokens = parse_macro_input!(input as Item);

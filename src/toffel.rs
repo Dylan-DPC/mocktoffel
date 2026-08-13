@@ -91,7 +91,7 @@ impl Toffelise for ItemEnum {
                     }),
                     Fields::Unit => {}
                     Fields::Named(_) => unreachable!(),
-                };
+                }
 
                 var.push(variant);
                 var

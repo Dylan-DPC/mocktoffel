@@ -3,11 +3,11 @@ use std::ops::Deref;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse, parse_str, FnArg, ImplItem, ImplItemFn, ImplItemType, ItemImpl, ReturnType, Type,
-    TypePath,
+    FnArg, ImplItem, ImplItemFn, ImplItemType, ItemImpl, ReturnType, Type, TypePath, parse,
+    parse_str,
 };
 
-use crate::extract::{prepare_mock_name, ExtractName, Extracted};
+use crate::extract::{ExtractName, Extracted, prepare_mock_name};
 
 pub struct MockContext {
     original_type: Box<Type>,
@@ -71,20 +71,27 @@ impl MockContext {
     fn replace_self_from_function_with_mocks(&self, mut f: ImplItemFn) -> ImplItem {
         let visibility = f.vis;
 
-        f.sig.inputs.iter_mut().filter_map(|arg| {
-                      if let FnArg::Typed(ref mut typ) = arg && typ.ty == self.original_type && let Type::Path(ref mut p) = &mut *typ.ty {
-                          Some(p)
-                      } else {
-                          None
-                      }
-              }).for_each(|p| {
-                    let segments = p.path.segments.last_mut().unwrap();
-                    let fn_generics = segments.arguments.clone();
-                    *p = parse_str(format!("{}", self.mocked_extract.name).as_str()).unwrap();
+        f.sig
+            .inputs
+            .iter_mut()
+            .filter_map(|arg| {
+                if let FnArg::Typed(typ) = arg
+                    && typ.ty == self.original_type
+                    && let Type::Path(p) = &mut *typ.ty
+                {
+                    Some(p)
+                } else {
+                    None
+                }
+            })
+            .for_each(|p| {
+                let segments = p.path.segments.last_mut().unwrap();
+                let fn_generics = segments.arguments.clone();
+                *p = parse_str(format!("{}", self.mocked_extract.name).as_str()).unwrap();
 
-                        let segment = p.path.segments.last_mut().unwrap();
-                        segment.arguments = fn_generics;
-              });
+                let segment = p.path.segments.last_mut().unwrap();
+                segment.arguments = fn_generics;
+            });
 
         let inputs = f.sig.inputs.iter();
 
@@ -93,33 +100,33 @@ impl MockContext {
         let original_name = self.original_type.extract_name();
         let generics = original_name.generics;
         syn::parse(match &f.sig.output {
-               ReturnType::Type(_, ref p) if let Type::Path(TypePath { path: pat, .. }) = p.deref() && pat.extract_name().name == original_name.name => {
-                   if pat.extract_name().name == original_name.name {
-                       TokenStream::from(quote! {
-                           #visibility fn #function_name (#(#inputs),*) -> #name #generics {
-                               <#name>::mock_new()
-                           }
-                       })
-                   } else {
-                      TokenStream::from(quote!(f))
-                   }
-               },
+            ReturnType::Type(_, p)
+                if let Type::Path(TypePath { path: pat, .. }) = p.deref()
+                    && pat.extract_name().name == original_name.name =>
+            {
+                if pat.extract_name().name == original_name.name {
+                    TokenStream::from(quote! {
+                        #visibility fn #function_name (#(#inputs),*) -> #name #generics {
+                            <#name>::mock_new()
+                        }
+                    })
+                } else {
+                    TokenStream::from(quote!(f))
+                }
+            }
 
-               ReturnType::Type(_, ty) => {
-                   TokenStream::from(quote!{
-                       #visibility fn #function_name(#(#inputs), *) -> #ty {
-                           Default::default()
-                       }
-                   })
-               },
+            ReturnType::Type(_, ty) => TokenStream::from(quote! {
+                #visibility fn #function_name(#(#inputs), *) -> #ty {
+                    Default::default()
+                }
+            }),
 
-               ReturnType::Default => {
-                   TokenStream::from(quote!{
-                       #visibility fn #function_name(#(#inputs), *) {
-                       }
-                   })
-               }
-           }).unwrap()
+            ReturnType::Default => TokenStream::from(quote! {
+                #visibility fn #function_name(#(#inputs), *) {
+                }
+            }),
+        })
+        .unwrap()
     }
 
     fn replace_mocks_in_associated_types(&self, associated_type: &mut ImplItemType) {
