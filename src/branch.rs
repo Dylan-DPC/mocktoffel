@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{
-    Ident, Type, TypeBareFn, TypeImplTrait, TypeParamBound, TypePath, TypePtr, TypeReference,
+    Ident, Type, TypeFnPtr, TypeImplTrait, TypeParamBound, TypePath, TypePtr, TypeReference,
     TypeTraitObject, TypeTuple, punctuated::Punctuated, token::Plus,
 };
 
@@ -12,7 +12,7 @@ use crate::extract::MockPrepared;
 pub fn get_mocking_candidate(field: &Type) -> MockPrepared {
     match field {
         Type::Array(arr) => get_mocking_candidate(&arr.elem),
-        Type::BareFn(f) => mock_function(f),
+        Type::FnPtr(f) => mock_function(f),
         Type::Group(g) => get_mocking_candidate(&g.elem),
         Type::ImplTrait(imp) => mock_and_impl_trait_for_it(imp),
         Type::Infer(_) => unreachable!(),
@@ -24,6 +24,7 @@ pub fn get_mocking_candidate(field: &Type) -> MockPrepared {
             p @ TypePath {
                 qself: Some(q),
                 path: _,
+                attrs: _,
             },
         ) => mock_associated_type(p),
         Type::Path(p) => resolve_path_and_mock(p),
@@ -37,7 +38,7 @@ pub fn get_mocking_candidate(field: &Type) -> MockPrepared {
     }
 }
 
-pub fn mock_function(f: &TypeBareFn) -> MockPrepared {
+pub fn mock_function(f: &TypeFnPtr) -> MockPrepared {
     todo!()
 }
 

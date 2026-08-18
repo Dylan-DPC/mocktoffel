@@ -5,7 +5,7 @@ use quote::quote;
 use std::fmt::Write;
 use syn::{
     AngleBracketedGenericArguments, Expr, GenericParam, Generics, Ident, Item, ItemEnum,
-    ItemStruct, Meta, Path, PathArguments, TraitBoundModifier, Type, TypeParamBound, TypePath,
+    ItemStruct, Meta, Path, PathArguments, TraitBoundModifiers, Type, TypeParamBound, TypePath,
     punctuated::Punctuated,
 };
 
@@ -51,13 +51,17 @@ impl ExtractName for Type {
     fn extract_name(&self) -> Extracted {
         match self {
             Self::Array(_) => todo!(),
-            Self::BareFn(f) => todo!(),
+            Self::FnPtr(f) => todo!(),
             Self::Group(g) => todo!(),
             Self::ImplTrait(im) => Extracted::with_ident(extract_name_for_bounds(im)),
             Self::Infer(inf) => unreachable!(),
             Self::Macro(m) => todo!(),
             Self::Paren(p) => todo!(),
-            Self::Path(TypePath { qself: None, path }) => path.extract_name(),
+            Self::Path(TypePath {
+                qself: None,
+                path,
+                attrs,
+            }) => path.extract_name(),
             Self::Ptr(p) => todo!(),
             _ => todo!(),
         }
@@ -86,7 +90,7 @@ fn extract_name_for_bounds<T: Traitified>(imp: &T) -> Ident {
         .iter()
         .filter_map(|merkmal| {
             if let TypeParamBound::Trait(trait_bound) = merkmal
-                && matches!(trait_bound.modifier, TraitBoundModifier::None)
+                && trait_bound.modifiers == TraitBoundModifiers::default()
             {
                 Some(&trait_bound.path)
             } else {

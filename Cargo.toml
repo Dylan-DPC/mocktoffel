@@ -14,7 +14,7 @@ proc-macro = true
 [dependencies]
 proc-macro2 = "1.0.56"
 quote = "1.0.26"
-syn = { version = "2.0.13", features = ["full", "extra-traits", "parsing"] }
+syn = { version = "3.0.3", features = ["full", "extra-traits", "parsing"] }
 
 [dev-dependencies]
 assert_proc = { path = "../assert_proc" }

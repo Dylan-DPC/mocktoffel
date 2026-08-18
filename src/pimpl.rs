@@ -29,7 +29,7 @@ impl MockContext {
         let original_name = original_type.extract_name();
         let Extracted { name, .. } = prepare_mock_name(&original_name);
 
-        if let Some((_, tr, _)) = tokens.trait_ {
+        if let Some((tr, _)) = tokens.trait_ {
             let functions = tokens.items.into_iter().map(|item| match item {
                 ImplItem::Fn(f) => self.replace_self_from_function_with_mocks(f),
                 ImplItem::Type(mut ty) => {
