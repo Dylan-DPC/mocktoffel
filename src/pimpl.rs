@@ -7,7 +7,7 @@ use syn::{
     parse_str,
 };
 
-use crate::extract::{ExtractName, Extracted, prepare_mock_name};
+use crate::extract::{Extracted, MockExtractor, prepare_mock_name};
 
 pub struct MockContext {
     original_type: Box<Type>,

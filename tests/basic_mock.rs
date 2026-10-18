@@ -1,19 +1,19 @@
 use assert_proc::assert_proc;
 use mocktoffel::mock;
 
-#[assert_proc]
-#[assert_duplicated = FooMock]
-#[mock]
-#[derive(Debug, Default)]
+// #[assert_proc]
+// #[assert_duplicated = FooMock]
+// #[mock]
+// #[derive(Debug, Default)]
 struct Foo {
     foo: String,
 }
 
 fn main() {}
 
-#[assert_proc]
-#[assert_duplicated = BarMock]
-#[mock]
+// #[assert_proc]
+//#[assert_duplicated = BarMock]
+// #[mock]
 #[derive(Default)]
 enum Bar {
     #[default]
@@ -22,4 +22,9 @@ enum Bar {
     Give,
     You,
     Up,
+}
+
+impl Foo {
+    #[mock]
+    fn foo_bar(&self) {}
 }

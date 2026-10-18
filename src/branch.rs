@@ -17,8 +17,8 @@ pub fn get_mocking_candidate(field: &Type) -> MockPrepared {
         Type::ImplTrait(imp) => mock_and_impl_trait_for_it(imp),
         Type::Infer(_) => unreachable!(),
         //TODO:: consider if we need to consider this case or not
-        Type::Macro(_) => todo!(),
-        Type::Never(_) => todo!(),
+        Type::Macro(_) => todo!("macro"),
+        Type::Never(_) => todo!("never"),
         Type::Paren(p) => get_mocking_candidate(&p.elem),
         Type::Path(
             p @ TypePath {
@@ -33,13 +33,24 @@ pub fn get_mocking_candidate(field: &Type) -> MockPrepared {
         Type::Slice(sl) => get_mocking_candidate(&sl.elem),
         Type::TraitObject(dym) => mock_and_impl_trait_for_it(dym),
         Type::Tuple(tup) => mock_tuple(tup),
-        Type::Verbatim(ts) => todo!(),
-        _ => unreachable!(),
+        Type::Verbatim(ts) => todo!("verbatim"),
+        _ => unreachable!("everything else"),
     }
 }
 
 pub fn mock_function(f: &TypeFnPtr) -> MockPrepared {
-    todo!()
+    let TypeFnPtr {
+        attrs,
+        lifetimes,
+        unsafety,
+        abi,
+        fn_token,
+        paren_token,
+        inputs,
+        variadic,
+        output,
+    } = f;
+    todo!("mock function")
 }
 
 pub fn mock_and_impl_trait_for_it<T: Traitified>(imp: &T) -> MockPrepared {
@@ -55,19 +66,19 @@ pub fn create_mock(mock_name: &str) -> TokenStream {
 }
 
 pub fn implement_trait_for_mock(tr: &Ident) -> TokenStream {
-    todo!()
+    todo!("trait for mock")
 }
 
 pub fn mock_pointer(p: &TypePtr) -> MockPrepared {
-    todo!()
+    todo!("pointer")
 }
 
 pub fn mock_associated_type(p: &TypePath) -> MockPrepared {
-    todo!()
+    todo!("associated type")
 }
 
 pub fn mock_reference(r: &TypeReference) -> MockPrepared {
-    todo!()
+    todo!("reference")
 }
 
 pub fn resolve_path_and_mock(path: &TypePath) -> MockPrepared {
@@ -78,7 +89,7 @@ pub fn resolve_path_and_mock(path: &TypePath) -> MockPrepared {
 }
 
 pub fn mock_tuple(t: &TypeTuple) -> MockPrepared {
-    todo!()
+    todo!("tuple")
 }
 
 pub trait Traitified {
@@ -104,6 +115,7 @@ mod tests {
         let path = syn::TypePath {
             qself: None,
             path: syn::parse_str("Foo").unwrap(),
+            attrs: vec![],
         };
         let mocked = resolve_path_and_mock(&path);
         assert_eq!(mocked.mocked_type, syn::parse_str("FooMock").unwrap());
@@ -114,6 +126,7 @@ mod tests {
         let path = syn::TypePath {
             qself: None,
             path: syn::parse_str("qow::Fow").unwrap(),
+            attrs: vec![],
         };
         let mocked = resolve_path_and_mock(&path);
         assert_eq!(mocked.mocked_type, syn::parse_str("qow::FowMock").unwrap());

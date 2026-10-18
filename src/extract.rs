@@ -4,9 +4,9 @@ use proc_macro2::Span;
 use quote::quote;
 use std::fmt::Write;
 use syn::{
-    AngleBracketedGenericArguments, Expr, GenericParam, Generics, Ident, Item, ItemEnum,
-    ItemStruct, Meta, Path, PathArguments, TraitBoundModifiers, Type, TypeParamBound, TypePath,
-    punctuated::Punctuated,
+    AngleBracketedGenericArguments, Expr, GenericParam, Generics, Ident, Item, ItemEnum, ItemFn,
+    ItemStruct, Meta, Path, PathArguments, ReturnType, Signature, TraitBoundModifiers, Type,
+    TypeParamBound, TypePath, punctuated::Punctuated,
 };
 
 pub struct MockPrepared {
@@ -43,11 +43,11 @@ impl Extracted {
 }
 
 #[allow(clippy::module_name_repetitions)]
-pub trait ExtractName {
+pub trait MockExtractor {
     fn extract_name(&self) -> Extracted;
 }
 
-impl ExtractName for Type {
+impl MockExtractor for Type {
     fn extract_name(&self) -> Extracted {
         match self {
             Self::Array(_) => todo!(),
@@ -68,7 +68,7 @@ impl ExtractName for Type {
     }
 }
 
-impl ExtractName for Path {
+impl MockExtractor for Path {
     fn extract_name(&self) -> Extracted {
         let segment = self.segments.last().unwrap();
         match &segment.arguments {
@@ -118,169 +118,6 @@ pub fn prepare_mock_name(name: &Extracted) -> Extracted {
     Extracted::new(Ident::new(&inp, Span::call_site()), name.generics.clone())
 }
 
-pub fn parse_fields_and_generate_for_values(schtruct: &mut ItemStruct) -> TokenStream {
-    let (fields, values) =
-        schtruct
-            .fields
-            .iter()
-            .fold((vec![], vec![]), |(mut fields, mut values), field| {
-                match (
-                    field
-                        .attrs
-                        .iter()
-                        .find(|attr| attr.meta.path().is_ident("mocked_with")),
-                    &field.ident,
-                ) {
-                    (Some(v), Some(ident)) if let Meta::List(ref list) = v.meta => {
-                        fields.push(ident.clone());
-                        values.push(list.tokens.clone());
-                    }
-                    (Some(v), _) if let Meta::List(ref list) = v.meta => {
-                        values.push(list.tokens.clone());
-                    }
-                    (None, Some(ident)) => {
-                        fields.push(ident.clone());
-                        values.push(quote!({ Default::default() }));
-                    }
-                    (None, _) => {
-                        values.push(quote!({ Default::default() }));
-                    }
-                    _ => todo!(),
-                }
-
-                (fields, values)
-            });
-
-    let struct_name = &schtruct.ident;
-    let generics = &mut schtruct.generics;
-    let mut impl_generics = generics.clone();
-    extract_generics_from_bounds(&mut impl_generics);
-
-    let tok = match (&fields[..], &values[..]) {
-        (&[], &[]) => {
-            quote! {
-                impl #generics #struct_name #impl_generics {
-                    pub fn mock_new() -> Self {
-                        Self {}
-                    }
-                }
-            }
-        }
-        (&[], v) => {
-            quote! {
-                impl #generics #struct_name #impl_generics {
-                    pub fn mock_new() -> Self {
-                        Self(#(#values),*)
-                    }
-                }
-            }
-        }
-        (f, v) => {
-            quote! {
-                impl #impl_generics #struct_name #impl_generics {
-                    pub fn mock_new() -> Self {
-                        Self {
-                            #(#fields : #values),*
-                        }
-                    }
-                }
-            }
-        }
-    };
-    TokenStream::from(tok)
-}
-
-#[allow(clippy::option_if_let_else)]
-pub fn parse_fields_and_generate_variant(enoom: &mut ItemEnum) -> TokenStream {
-    let enum_name = enoom.ident.clone();
-    let extracted = Extracted::with_ident(enum_name.clone());
-    let mocked = prepare_mock_name(&extracted);
-
-    let mocked_name = &mocked.name;
-    let tok = if let Some(variant) = enoom.variants.iter_mut().find(|field| {
-        field.attrs.iter().any(|attr| {
-            if let Meta::NameValue(nv) = &attr.meta
-                && nv.path.is_ident("mocked_with")
-            {
-                true
-            } else {
-                false
-            }
-        })
-    }) {
-        let variant_name = &mut variant.ident;
-        if let Meta::NameValue(ref mut ml) = variant.attrs.first_mut().unwrap().meta {
-            let value = &mut ml.value;
-            replace_with_mocked(value, &enum_name, &mocked);
-            quote! {
-                impl #enum_name {
-                    pub fn mock_new() -> #mocked_name {
-                        #value
-                    }
-                }
-            }
-        } else {
-            quote! {
-                impl #enum_name {
-                    pub fn mock_new() -> #mocked_name {
-                        Self::#variant_name
-                    }
-                }
-            }
-        }
-    } else if let (Some(variant), Some(field)) =
-        enoom
-            .variants
-            .iter()
-            .fold((None, None), |(picked_value, picked_field), variant| {
-                variant.fields.iter().fold(
-                    (picked_value, picked_field),
-                    |(picked_value, picked_field), field| {
-                        field.attrs.iter().fold(
-                            (picked_value, picked_field),
-                            |(picked_value, field), attr| {
-                                if let Meta::NameValue(nv) = &attr.meta
-                                    && nv.path.is_ident("mocked_with")
-                                {
-                                    (Some(variant), Some(nv.value.clone()))
-                                } else {
-                                    (None, None)
-                                }
-                            },
-                        )
-                    },
-                )
-            })
-    {
-        let variant_name = &variant.ident;
-        quote! {
-            impl #enum_name {
-                pub fn mock_new() -> #mocked_name {
-                    Self::#variant_name(#field)
-                }
-            }
-        }
-    } else if let Some(mocked_value) = get_mocked_value_from_attributes(enoom, &mocked) {
-        quote! {
-            impl #enum_name {
-                pub fn mock_new() -> #mocked_name {
-                    #mocked_value
-                }
-            }
-        }
-    } else {
-        quote! {
-            impl #enum_name {
-                pub fn mock_new() -> Self {
-                   Self::default()
-                }
-            }
-        }
-    };
-
-    TokenStream::from(tok)
-}
-
 pub fn extract_generics_from_bounds(bounds: &mut Generics) {
     bounds.params.iter_mut().for_each(|bound| match bound {
         GenericParam::Type(ty) => {
@@ -315,66 +152,84 @@ pub fn get_mocked_value_from_attributes(enoom: &mut ItemEnum, mocked: &Extracted
         })
 }
 
-pub fn clean_out_attributes(item: &mut Item) {
-    match item {
-        Item::Struct(s) => {
-            s.fields.iter_mut().for_each(|field| {
-                field.attrs = field
-                    .attrs
-                    .extract_if(.., |attr| {
-                        if let Meta::Path(ref p) = attr.meta {
-                            p.get_ident().map(|x| *x == "mocked").is_some()
-                        } else {
-                            false
-                        }
-                    })
-                    .collect();
-            });
+pub trait AttributeCleaner {
+    fn clean_out_attributes(&mut self);
+}
+
+impl AttributeCleaner for Item {
+    fn clean_out_attributes(&mut self) {
+        match self {
+            Item::Struct(s) => s.clean_out_attributes(),
+            Item::Enum(e) => e.clean_out_attributes(),
+            Item::Fn(f) => f.clean_out_attributes(),
+            _ => {}
         }
-        Item::Enum(e) => {
-            e.attrs.retain(|attr| {
-                if let Meta::NameValue(p) = &attr.meta
-                    && p.path.get_ident().map(|x| *x == "mocked_with").is_some()
-                {
-                    false
+    }
+}
+
+impl AttributeCleaner for ItemStruct {
+    fn clean_out_attributes(&mut self) {
+        dbg!("test");
+        self.fields.iter_mut().for_each(|field| {
+            field.attrs = field
+                .attrs
+                .extract_if(.., |attr| {
+                    if let Meta::Path(ref p) = attr.meta {
+                        dbg!(&p);
+                        p.get_ident()
+                            .map(|x| *x == "mocked" || *x == "mocked_with")
+                            .is_some()
+                    } else {
+                        false
+                    }
+                })
+                .collect();
+        });
+    }
+}
+
+impl AttributeCleaner for ItemEnum {
+    fn clean_out_attributes(&mut self) {
+        self.attrs.retain(|attr| {
+            if let Meta::NameValue(p) = &attr.meta
+                && p.path.get_ident().map(|x| *x == "mocked_with").is_some()
+            {
+                false
+            } else {
+                true
+            }
+        });
+
+        self.variants.iter_mut().for_each(|field| {
+            field.attrs = field
+                .attrs
+                .iter()
+                .filter_map(|attr| {
+                    if let Meta::NameValue(ref p) = attr.meta
+                        && p.path.get_ident().map(|x| *x == "mocked_with").is_some()
+                    {
+                        None
+                    } else {
+                        Some(attr.clone())
+                    }
+                })
+                .collect();
+        });
+    }
+}
+
+impl AttributeCleaner for ItemFn {
+    fn clean_out_attributes(&mut self) {
+        self.attrs = self
+            .attrs
+            .extract_if(.., |attr| {
+                if let Meta::Path(ref p) = attr.meta {
+                    p.get_ident().map(|x| *x == "mocked").is_some()
                 } else {
-                    true
+                    false
                 }
-            });
-
-            e.variants.iter_mut().for_each(|field| {
-                field.attrs = field
-                    .attrs
-                    .iter()
-                    .filter_map(|attr| {
-                        if let Meta::NameValue(ref p) = attr.meta
-                            && p.path.get_ident().map(|x| *x == "mocked_with").is_some()
-                        {
-                            None
-                        } else {
-                            Some(attr.clone())
-                        }
-                    })
-                    .collect();
-
-                field.fields.iter_mut().for_each(|field| {
-                    field.attrs = field
-                        .attrs
-                        .iter()
-                        .filter_map(|attr| {
-                            if let Meta::NameValue(ref p) = attr.meta
-                                && p.path.get_ident().map(|x| *x == "mocked_with").is_some()
-                            {
-                                None
-                            } else {
-                                Some(attr.clone())
-                            }
-                        })
-                        .collect();
-                });
-            });
-        }
-        _ => unreachable!(),
+            })
+            .collect();
     }
 }
 
@@ -403,5 +258,249 @@ fn replace_with_mocked(expr: &mut Expr, name: &Ident, mocked: &Extracted) {
         }
 
         _ => todo!("other exprs matter"),
+    }
+}
+
+pub trait PrepareMockParams: AttributeCleaner {
+    fn extract_mock(&mut self) -> TokenStream {
+        let name = self.mock_name();
+        self.set_ident(name.into());
+        self.extract_members()
+    }
+    fn mock_name(&self) -> Ident;
+    fn extract_members(&mut self) -> TokenStream;
+    fn set_ident(&mut self, ident: Ident);
+}
+
+impl PrepareMockParams for ItemStruct {
+    fn mock_name(&self) -> Ident {
+        Ident::new(format!("{}Mock", self.ident).as_str(), Span::call_site())
+    }
+
+    fn extract_members(&mut self) -> TokenStream {
+        let (fields, values) =
+            self.fields
+                .iter()
+                .fold((vec![], vec![]), |(mut fields, mut values), field| {
+                    match (
+                        field
+                            .attrs
+                            .iter()
+                            .find(|attr| attr.meta.path().is_ident("mocked_with")),
+                        &field.ident,
+                    ) {
+                        (Some(v), Some(ident)) if let Meta::List(ref list) = v.meta => {
+                            fields.push(ident.clone());
+                            values.push(list.tokens.clone());
+                        }
+                        (Some(v), _) if let Meta::List(ref list) = v.meta => {
+                            values.push(list.tokens.clone());
+                        }
+                        (None, Some(ident)) => {
+                            fields.push(ident.clone());
+                            values.push(quote!({ Default::default() }));
+                        }
+                        (None, _) => {
+                            values.push(quote!({ Default::default() }));
+                        }
+                        _ => todo!(),
+                    }
+
+                    (fields, values)
+                });
+
+        let struct_name = &self.ident;
+        let generics = &self.generics;
+        let mut impl_generics = self.generics.clone();
+        extract_generics_from_bounds(&mut impl_generics);
+
+        let tok = match (&fields[..], &values[..]) {
+            (&[], &[]) => {
+                quote! {
+                    impl #generics #struct_name #impl_generics {
+                        pub fn mock_new() -> Self {
+                            Self {}
+                        }
+                    }
+                }
+            }
+            (&[], v) => {
+                quote! {
+                    impl #generics #struct_name #impl_generics {
+                        pub fn mock_new() -> Self {
+                            Self(#(#values),*)
+                        }
+                    }
+                }
+            }
+            (f, v) => {
+                quote! {
+                    impl #impl_generics #struct_name #impl_generics {
+                        pub fn mock_new() -> Self {
+                            Self {
+                                #(#fields : #values),*
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        TokenStream::from(tok)
+    }
+
+    fn set_ident(&mut self, ident: Ident) {
+        self.ident = ident;
+    }
+}
+
+impl PrepareMockParams for ItemEnum {
+    fn mock_name(&self) -> Ident {
+        Ident::new(format!("{}Mock", self.ident).as_str(), Span::call_site())
+    }
+
+    fn extract_members(&mut self) -> TokenStream {
+        let enum_name = self.ident.clone();
+        let extracted = Extracted::with_ident(enum_name.clone());
+        let mocked = prepare_mock_name(&extracted);
+
+        let mocked_name = &mocked.name;
+
+        let tok = if let Some(variant) = self.variants.iter_mut().find(|field| {
+            field.attrs.iter().any(|attr| {
+                if let Meta::NameValue(nv) = &attr.meta
+                    && nv.path.is_ident("mocked_with")
+                {
+                    true
+                } else {
+                    false
+                }
+            })
+        }) {
+            let variant_name = &mut variant.ident;
+            if let Meta::NameValue(ref mut ml) = variant.attrs.first_mut().unwrap().meta {
+                let value = &mut ml.value;
+                replace_with_mocked(value, &enum_name, &mocked);
+                quote! {
+                    impl #enum_name {
+                        pub fn mock_new() -> #mocked_name {
+                            #value
+                        }
+                    }
+                }
+            } else {
+                quote! {
+                    impl #enum_name {
+                        pub fn mock_new() -> #mocked_name {
+                            Self::#variant_name
+                        }
+                    }
+                }
+            }
+        } else if let (Some(variant), Some(field)) =
+            self.variants
+                .iter()
+                .fold((None, None), |(picked_value, picked_field), variant| {
+                    variant.fields.iter().fold(
+                        (picked_value, picked_field),
+                        |(picked_value, picked_field), field| {
+                            field.attrs.iter().fold(
+                                (picked_value, picked_field),
+                                |(picked_value, field), attr| {
+                                    if let Meta::NameValue(nv) = &attr.meta
+                                        && nv.path.is_ident("mocked_with")
+                                    {
+                                        (Some(variant), Some(nv.value.clone()))
+                                    } else {
+                                        (None, None)
+                                    }
+                                },
+                            )
+                        },
+                    )
+                })
+        {
+            let variant_name = &variant.ident;
+            quote! {
+                impl #enum_name {
+                    pub fn mock_new() -> #mocked_name {
+                        Self::#variant_name(#field)
+                    }
+                }
+            }
+        } else if let Some(mocked_value) = get_mocked_value_from_attributes(self, &mocked) {
+            quote! {
+                impl #enum_name {
+                    pub fn mock_new() -> #mocked_name {
+                        #mocked_value
+                    }
+                }
+            }
+        } else {
+            quote! {
+                impl #enum_name {
+                    pub fn mock_new() -> Self {
+                       Self::default()
+                    }
+                }
+            }
+        };
+
+        TokenStream::from(tok)
+    }
+
+    fn set_ident(&mut self, ident: Ident) {
+        self.ident = ident;
+    }
+}
+
+impl PrepareMockParams for ItemFn {
+    fn mock_name(&self) -> Ident {
+        Ident::new(
+            format!("{}_mock", self.sig.ident).as_str(),
+            Span::call_site(),
+        )
+    }
+
+    fn extract_members(&mut self) -> TokenStream {
+        let visibility = self.vis.clone();
+        let Signature {
+            constness,
+            asyncness,
+            safety,
+            abi,
+            fn_token: _,
+            ident,
+            generics,
+            paren_token,
+            inputs,
+            variadic,
+            output,
+        } = &self.sig;
+        let mocked = self.attrs.iter().find_map(|attr| {
+            if let Meta::NameValue(nv) = &attr.meta
+                && nv.path.is_ident("mocked_with")
+            {
+                Some(nv.value.clone())
+            } else {
+                None
+            }
+        });
+        dbg!(&self.sig);
+        match output {
+            ReturnType::Type(ty, ret) => TokenStream::from(quote! {
+                #visibility #constness #asyncness #safety #abi fn ident(#inputs) #ty #ret {
+                    #mocked
+                }
+            }),
+            ReturnType::Default => TokenStream::from(quote! {
+                #visibility #constness #asyncness #safety #abi fn ident(#inputs) {
+                    #mocked
+                }
+            }),
+        }
+    }
+
+    fn set_ident(&mut self, ident: Ident) {
+        self.sig.ident = ident;
     }
 }

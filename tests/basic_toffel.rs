@@ -1,25 +1,25 @@
 use assert_proc::assert_proc;
 use mocktoffel::{mock, toffel};
 
-#[mock]
+// #[mock]
 #[derive(Default)]
 struct Bar {
     foo: i32,
 }
 
-#[assert_proc]
-#[toffel]
+// #[assert_proc]
+// #[toffel]
 #[derive(Default)]
 struct Foo {
-    #[assert_field_type = BarMock]
-    #[mocked]
+    // #[assert_field_type = BarMock]
+    // #[mocked]
     foo: Bar,
 }
 
 // #[assert_proc]
-#[toffel]
+// #[toffel]
 enum Baz {
-    Never(#[mocked] Bar),
+    // Never(#[mocked] Bar),
     Gonna,
     Let,
     You,

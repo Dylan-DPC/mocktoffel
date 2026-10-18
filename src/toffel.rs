@@ -9,11 +9,17 @@ pub trait Toffelise {
 
 impl Toffelise for ItemStruct {
     fn replace_mocks(self) -> TokenStream {
-        let struct_name = self.ident;
-        let generics = self.generics;
-        let attributes = self.attrs;
+        let ItemStruct {
+            attrs,
+            vis,
+            struct_token,
+            ident,
+            generics,
+            fields,
+            semi_token,
+        } = self;
 
-        match self.fields {
+        match fields {
             Fields::Named(named) => {
                 let fields: Vec<Field> = named
                     .named
@@ -32,8 +38,8 @@ impl Toffelise for ItemStruct {
                     .collect();
 
                 TokenStream::from(quote! {
-                    #(#attributes)*
-                       struct #struct_name #generics {
+                    #(#attrs)*
+                       #vis struct #ident #generics {
                              #(#fields),*
                        }
                 })
@@ -57,8 +63,8 @@ impl Toffelise for ItemStruct {
                     .collect();
 
                 TokenStream::from(quote! {
-                    #(#attributes)*
-                   struct #struct_name #generics(
+                    #(#attrs)*
+                   #vis struct #ident #generics(
                          #(#fields),*
                     );
 

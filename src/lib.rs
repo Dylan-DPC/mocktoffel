@@ -41,12 +41,12 @@
 //! ```
 use crate::pimpl::MockContext;
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{Item, ItemImpl, parse_macro_input, parse_str};
+use syn::{Item, ItemImpl, parse_macro_input};
 use toffel::Toffelise;
 
 mod branch;
 mod extract;
+mod mock;
 mod pimpl;
 mod toffel;
 
@@ -120,32 +120,8 @@ pub fn toffel(tokens: TokenStream, input: TokenStream) -> TokenStream {
 #[allow(clippy::missing_panics_doc)]
 #[proc_macro_attribute]
 pub fn mock(tokens: TokenStream, input: TokenStream) -> TokenStream {
-    let mut tokens = parse_macro_input!(input as Item);
-    let mut mock = tokens.clone();
-    let fields = match mock {
-        Item::Struct(ref mut s) => {
-            let name = format!("{}Mock", s.ident);
-            s.ident = parse_str(name.as_str()).unwrap();
-            extract::parse_fields_and_generate_for_values(s)
-        }
-        Item::Enum(ref mut e) => {
-            let f = extract::parse_fields_and_generate_variant(e);
-            let name = format!("{}Mock", e.ident);
-            e.ident = parse_str(name.as_str()).unwrap();
-            f
-        }
-        _ => todo!(),
-    };
-
-    extract::clean_out_attributes(&mut tokens);
-    extract::clean_out_attributes(&mut mock);
-    let mut original_and_mocked_struct = TokenStream::from(quote! {
-        #tokens
-        #mock
-    });
-
-    original_and_mocked_struct.extend_one(fields);
-    original_and_mocked_struct
+    let tokens = parse_macro_input!(input as Item);
+    crate::mock::mock(tokens)
 }
 
 /// A helper macro that substitutes the original type with the mocked type on implementations and
