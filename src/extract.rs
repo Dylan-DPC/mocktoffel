@@ -169,7 +169,6 @@ impl AttributeCleaner for Item {
 
 impl AttributeCleaner for ItemStruct {
     fn clean_out_attributes(&mut self) {
-        dbg!("test");
         self.fields.iter_mut().for_each(|field| {
             field.attrs = field
                 .attrs
@@ -185,6 +184,7 @@ impl AttributeCleaner for ItemStruct {
                 })
                 .collect();
         });
+        dbg!(&self.fields);
     }
 }
 
@@ -264,7 +264,7 @@ fn replace_with_mocked(expr: &mut Expr, name: &Ident, mocked: &Extracted) {
 pub trait PrepareMockParams: AttributeCleaner {
     fn extract_mock(&mut self) -> TokenStream {
         let name = self.mock_name();
-        self.set_ident(name.into());
+        self.set_ident(name);
         self.extract_members()
     }
     fn mock_name(&self) -> Ident;

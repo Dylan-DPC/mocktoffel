@@ -3,9 +3,10 @@ use mocktoffel::mock;
 
 // #[assert_proc]
 // #[assert_duplicated = FooMock]
-// #[mock]
-// #[derive(Debug, Default)]
+#[mock]
+#[derive(Debug, Default)]
 struct Foo {
+    #[mocked_with(String::from("Foo"))]
     foo: String,
 }
 
